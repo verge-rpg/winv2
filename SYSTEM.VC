@@ -1,0 +1,32 @@
+void Autoexec()
+{
+ CacheSounds();
+ map("title.map");
+}
+
+void CenterString(int y, string text)
+{
+int x;
+x=strlen(text)*7/2;
+x=160-x;
+GotoXY(x, y);
+PrintString(0, text);
+}
+
+void CenterStringX(int x1, int y, string text)
+{
+int x;
+x=strlen(text)*7/2;
+x=x1-x;
+GotoXY(x, y);
+PrintString(0, text);
+}
+
+#include "object.vh"
+#include "platform.vc"
+#include "object.vc"
+#include "enemy.vc"
+#include "meter.vc"
+#include "sound.vc"
+#include "game.vc"
+

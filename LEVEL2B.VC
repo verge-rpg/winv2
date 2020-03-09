@@ -1,0 +1,5 @@
+event
+{
+PaletteMorph(0,0,0,0,63);
+MainPlatformLoop();
+}

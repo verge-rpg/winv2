@@ -1,0 +1,35 @@
+struct vspanim_r
+{
+  word start;                        // strand start
+  word finish;                       // strand end
+  word delay;                        // tile-switch delay
+  word mode;                         // tile-animation mode
+};
+
+extern quad pal[256];
+
+class VSP
+{
+public:
+	int  numtiles;
+	quad mytimer;
+
+	VSP(char *fname);
+	~VSP();
+	void Blit(int x, int y, int tile, image *dest);
+	void TBlit(int x, int y, int tile, image *dest);
+	void CheckTileAnimation();
+
+	void *vspspace;
+	int  bppmultiplier;
+	vspanim_r vspanim[100];
+	int vadelay[100];
+	int *tileidx;
+	int *flipped;
+
+	void LoadAnimation(VFILE *f);
+	void Animate(byte);
+	void AnimateTile(byte, int);
+	void DecodeByteCompression(byte *dest, int len, byte *buf);
+	void LoadVSP(char *fname);	
+};
