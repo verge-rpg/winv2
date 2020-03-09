@@ -1,12 +1,12 @@
 class CHR
 {
 public:
-	image *rawdata, *container;
+	byte *imagedata;
 
-	word fxsize, fysize;                // frame x/y dimensions
-	word hx, hy;                        // x/y obstruction hotspot
-	word hw, hh;
-	word totalframes;                   // total # of frames.
+	int fxsize, fysize;                // frame x/y dimensions
+	int hx, hy;                        // x/y obstruction hotspot
+	int hw, hh;
+	int totalframes;                   // total # of frames.
     int idle[4];                       // way handier
 
 	char lanim[100];

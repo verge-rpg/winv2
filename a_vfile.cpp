@@ -245,3 +245,10 @@ void vgets(char *str, int len, VFILE *f)
    }
    fgets(str, len, f->fp);
 }
+
+int vtell(VFILE* f)
+{
+	if (!f->s)
+		return ftell(f->fp);
+	return pack[f->v].files[f->i].curofs;
+}

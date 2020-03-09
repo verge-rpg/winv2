@@ -109,6 +109,10 @@ SOURCE=.\a_vfile.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\g_8bpp.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\g_chr.cpp
 # End Source File
 # Begin Source File
@@ -257,7 +261,15 @@ SOURCE=.\amp11lib.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\ddraw.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\fontdef.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\g_8bpp.h
 # End Source File
 # Begin Source File
 
@@ -298,6 +310,10 @@ SOURCE=.\libvc.h
 # Begin Source File
 
 SOURCE=.\vccode.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\vergepal.h
 # End Source File
 # Begin Source File
 

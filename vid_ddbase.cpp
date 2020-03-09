@@ -273,13 +273,13 @@ void dd_Flip()
 		dx_bs->BltFast(0,0,dx_os,NULL,DDBLTFAST_WAIT | DDBLTFAST_NOCOLORKEY);
 	}
 
-	hr=dx_ps->Flip(0,DDFLIP_WAIT);// | DDFLIP_NOVSYNC);
+	hr=dx_ps->Flip(0,DDFLIP_WAIT | DDFLIP_NOVSYNC);
 	//dx_ps->Flip(0,0);
 
 	if(hr==DDERR_SURFACELOST)
 	{
 		dx_ps->Restore();
-		hr=dx_ps->Flip(0,DDFLIP_WAIT);// | DDFLIP_NOVSYNC);
+		hr=dx_ps->Flip(0,DDFLIP_WAIT | DDFLIP_NOVSYNC);
 	}
 	
 	

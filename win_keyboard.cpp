@@ -18,12 +18,13 @@ byte lastpressed;
 
 /****************************** code ******************************/
 
-void UpdateKeyboard()
+int ParseKeyEvent()
 {
 	HRESULT hr;
 	int y=0;
 	DIDEVICEOBJECTDATA rgod[64];
 	DWORD cod=64, iod;
+	bool key_pressed = false;
 	
 	HandleMessages();	
 	hr = di_keyb -> GetDeviceData(sizeof(DIDEVICEOBJECTDATA),rgod, &cod, 0);	//retrive data
@@ -31,7 +32,7 @@ void UpdateKeyboard()
 	{
 		hr = di_keyb -> Acquire();
 		if(!SUCCEEDED(hr))
-			if(hr==DIERR_OTHERAPPHASPRIO) return;
+			if(hr==DIERR_OTHERAPPHASPRIO) return 1;
 	}
 	else if(cod>0&&cod<=64)
 	{
@@ -41,6 +42,7 @@ void UpdateKeyboard()
 			{
 				keys[rgod[iod].dwOfs]=(char) 0x80;
 				lastpressed = (char) rgod[iod].dwOfs;
+				key_pressed = true;
 				if (lastpressed != repeatedkey)
 				{
 					key_timer = systemtime;
@@ -102,8 +104,19 @@ void UpdateKeyboard()
 	if (lastpressed == SCAN_UP && keys[SCAN_DOWN]) keys[SCAN_DOWN]=0;
 	if (lastpressed == SCAN_DOWN && keys[SCAN_UP]) keys[SCAN_UP]=0;
 
-	if (bindarray[lastpressed]) 
+	if (key_pressed && bindarray[lastpressed])
 		HookKey(bindarray[lastpressed]);
+	if (key_pressed) 
+		return 1;
+	return 0;
+}
+
+void UpdateKeyboard()
+{
+	int result;
+	do 
+		result = ParseKeyEvent();
+	while (result);
 }
 
 void ShutdownKeyboard()

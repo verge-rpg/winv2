@@ -836,7 +836,7 @@ void dd16_Clear(int color, image *dest)
 
 
 int dd16_ReadPixel(int x, int y, image *source)
-{
+{	
 	word *ptr = (word*)source->data;
 	return ptr[(y * source->pitch) + x];
 }
@@ -2010,7 +2010,7 @@ void dd16_Blit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], imag
 		ylen=h;
 	int cx1=0, cy1=0,
 		cx2=0, cy2=0;
-	word sc;
+	int sc;
 
 	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
 	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
@@ -2035,7 +2035,7 @@ void dd16_Blit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], imag
 		for (x=0; x<xlen; x++)
 		{
 			sc=pal[s[x]];
-	        sc=(sc & tmask) + (d[x] & tmask);
+			sc=(sc & tmask) + (d[x] & tmask);
 			d[x] = (word) (sc >> 1);			
 		}	
 		s+=spitch;
@@ -2097,7 +2097,7 @@ void dd16_TBlit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], ima
 		ylen=h;
 	int cx1=0, cy1=0,
 		cx2=0, cy2=0;
-	word sc;
+	int sc;
 
 	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
 	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
@@ -2122,8 +2122,8 @@ void dd16_TBlit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], ima
 		for (x=0; x<xlen; x++)
 		{
 			if (!s[x]) continue;
-			sc=pal[s[x]];
-	        sc=(sc & tmask) + (d[x] & tmask);
+			sc = pal[s[x]];
+	        sc = (sc & tmask) + (d[x] & tmask);
 			d[x] = (word) (sc >> 1);			
 		}	
 		s+=spitch;
@@ -3819,6 +3819,177 @@ void dd32_TBlit_lucent(int x, int y, image *src, image *dest)
 }
 
 
+void dd32_Blit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
+{
+	byte *s = (byte *) src;
+	quad *d = (quad *) dest->data;
+	int spitch=w,
+		dpitch=dest->pitch;
+	int xlen=w,
+		ylen=h;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d+=(y*dest->pitch)+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)			
+			d[x]=pal[s[x]];
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd32_Blit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], image *dest)
+{
+	byte *s = (byte *) src;
+	quad *d = (quad *) dest->data;
+	int spitch=w,
+		dpitch=dest->pitch;
+	int xlen=w,
+		ylen=h;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	int sc;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d+=(y*dest->pitch)+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			sc = pal[s[x]];
+	        sc = (sc & tmask) + (d[x] & tmask);
+			d[x] = (quad) (sc >> 1);			
+		}	
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd32_TBlit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
+{
+	byte *s = (byte *) src;
+	quad *d = (quad *) dest->data;
+	int spitch=w,
+		dpitch=dest->pitch;
+	int xlen=w,
+		ylen=h;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	byte c;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x = cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y=cy1;
+	}
+	d+=y*dpitch+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			c=s[x];
+			if (c) d[x]=pal[c];
+		}
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd32_TBlit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], image *dest)
+{
+	byte *s = (byte *) src;
+	quad *d = (quad *) dest->data;
+	int spitch=w,
+		dpitch=dest->pitch;
+	int xlen=w,
+		ylen=h;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	int sc;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d+=(y*dest->pitch)+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			if (!s[x]) continue;
+			sc = pal[s[x]];
+	        sc = (sc & tmask) + (d[x] & tmask);
+			d[x] = (quad) (sc >> 1);			
+		}	
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
 void dd32_BlitTile(int x, int y, char *src, image *dest)
 {
 	quad *s=(quad *) src,
@@ -4072,6 +4243,61 @@ void dd32_ScaleBlit_lucent(int x, int y, int dw, int dh, image *src, image *dest
 		d    += dest->pitch;
 		yerr += yadj;
 		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
+	}
+}
+
+
+void dd32_ScaleBlit8(int x, int y, int dw, int dh, byte *src, int sw, int sh, quad pal[],  image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	quad *d;
+	byte *s;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2
+	|| x + xl < cx1 || y + yl < cy1)
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (sw << 16)/dw;
+	yadj = (sh << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (byte *) src;
+	s += ((yerr_start >> 16) * sw);
+	d = ((quad *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			d[j] = pal[s[(xerr >> 16)]];
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*sw;
 		yerr &= 0xffff;
 	}
 }
@@ -4395,6 +4621,8 @@ int SetLucent(int percent)
 				VLine			= dd32_VLine;
 				Blit            = dd32_Blit;
 				TBlit           = dd32_TBlit;
+				Blit8           = dd32_Blit8;
+				TBlit8          = dd32_TBlit8;
 				BlitTile        = dd32_BlitTile;
 				TBlitTile		= dd32_TBlitTile;
 				ScaleBlit       = dd32_ScaleBlit;
@@ -4412,6 +4640,8 @@ int SetLucent(int percent)
 				VLine			= dd32_VLine_50lucent;
 				Blit            = dd32_Blit_50lucent;
 				TBlit			= dd32_TBlit_50lucent;
+				Blit8           = dd32_Blit8_50lucent;
+				TBlit8          = dd32_TBlit8_50lucent;
 				ScaleBlit		= dd32_ScaleBlit_50lucent;
 				WrapBlit		= dd32_WrapBlit_50lucent;
 				AdditiveBlit	= dd32_AddBlit_50lucent;
@@ -4427,13 +4657,14 @@ int SetLucent(int percent)
 				VLine			= dd32_VLine_lucent;
 				Blit			= dd32_Blit_lucent;
 				TBlit			= dd32_TBlit_lucent;
+				Blit8           = dd32_Blit8_50lucent;
+				TBlit8          = dd32_TBlit8_50lucent;
 				ScaleBlit		= dd32_ScaleBlit_lucent;
 				WrapBlit		= dd32_WrapBlit_lucent;
 				AdditiveBlit	= dd32_AddBlit_lucent;
 				TAdditiveBlit	= dd32_TAddBlit_lucent;
 				SubtractiveBlit	= dd32_SubtractBlit_lucent;
 				TSubtractiveBlit= dd32_TSubtractBlit_lucent;
-
 				return oldalpha;
 			}
 
@@ -4526,14 +4757,17 @@ void dd_RegisterBlitters()
 			Sphere          = dd_Sphere;
 			Circle          = dd_Circle;
 			Blit            = dd32_Blit;
+			TBlit           = dd32_TBlit;
+			Blit8			= dd32_Blit8;
+			TBlit8			= dd32_TBlit8;
 			AdditiveBlit	= dd32_AddBlit;
 			TAdditiveBlit	= dd32_TAddBlit;
 			SubtractiveBlit = dd32_SubtractBlit;
 			TSubtractiveBlit= dd32_TSubtractBlit;
-			TBlit           = dd32_TBlit;
 			BlitTile        = dd32_BlitTile;
 			TBlitTile		= dd32_TBlitTile;
 			ScaleBlit       = dd32_ScaleBlit;
+			ScaleBlit8      = dd32_ScaleBlit8;
 			WrapBlit        = dd32_WrapBlit;
 			ImageFrom8bpp	= dd32_ImageFrom8bpp;
 			ImageFrom24bpp	= dd32_ImageFrom24bpp;

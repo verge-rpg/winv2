@@ -40,7 +40,6 @@ int img_load_CheckGIF(void *header)
 		return 1;
 }
 
-
 /********************* GIF imaging routines *********************/
 
 #define TRUE  1
@@ -704,5 +703,8 @@ byte *xLoadImage8bpp(char *name)
 		case 1: blah = LoadGIFBuf(name); break;
 		default: err("xLoadImage8bpp: Internal error.");
 	}
+	for (int i=0; i<256; i++)
+		pal[i] = MakeColor(palconv[i * 3], palconv[(i * 3) + 1], palconv[(i * 3) + 2]);
+	memcpy(base_pal, pal, sizeof pal);
 	return blah;
 }

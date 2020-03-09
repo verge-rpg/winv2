@@ -41,6 +41,7 @@ typedef unsigned char  byte;
 #include "win_system.h"
 #include "win_sound.h"
 #include "win_timer.h"
+#include "g_8bpp.h"
 #include "g_controls.h"
 #include "g_chr.h"
 #include "g_fnt.h"

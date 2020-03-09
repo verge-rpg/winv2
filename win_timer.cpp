@@ -18,6 +18,7 @@ void CALLBACK DefaultTimer(UINT uID,UINT uMsg,DWORD dwUser,DWORD dw1,DWORD dw2)
 	systemtime++;
 	timer++;
 	vctimer++;
+	HookTimer();
 }
 
 void timer_Init(int hz)

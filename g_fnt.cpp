@@ -8,9 +8,10 @@
 /***************************** code *****************************/
 
 FNT::FNT(char *fname)
-{	
+{
 	VFILE *f = vopen(fname);
 	if (!f) err("FNT::FNT(), could not open %s", fname);
+
 	
 	byte ver = vgetc(f);
 	if (ver != 1)	
@@ -27,24 +28,38 @@ FNT::FNT(char *fname)
 	if (subsets < 1 || subsets > 4)
 		err("FNT::FNT(), illegal # of subsets");
 	
-	byte *imagedata = new byte[width*height*96*subsets];
+	imagedata = new byte[width*height*96*subsets];
 	vread(imagedata, width*height*96*subsets, f);
 	totalframes = 96 * subsets;
-	vclose(f);
-
-	rawdata = new image(width, height*96*subsets);
-	for (int i=0; i<width*height*96*subsets; i++)
-		PutPixel(i%width, i/width, imagedata[i] ? base_pal[imagedata[i]] : transColor, rawdata);
-	container = new image(width, height);
-	delete[] container->data;
-	delete[] imagedata;
+	vclose(f);	
 }
 
 FNT::~FNT()
-{	
-	container->data = 0;
-	delete container;
-	delete rawdata;
+{
+	delete[] imagedata;
+
+}
+
+int FNT::uncompress(byte* dest, int len, char *buf)
+{
+    byte run, w;
+    do
+    {
+        run = 1;
+        w = *buf++;
+        if (0xFF == w)
+        {
+            run = *buf++;
+            w = *buf++;
+        }
+        len -= run;
+
+        if (len < 0)
+			return 1;
+        while (run--)
+            *dest++ = w;
+    } while (len);
+    return 0;
 }
 
 void FNT::Render(int x, int y, int frame, image *dest)
@@ -52,8 +67,8 @@ void FNT::Render(int x, int y, int frame, image *dest)
 	if (frame >= totalframes)
 		err("FNT::Render(), char requested is undefined");
 
-	container->data = (void *) ((int) rawdata->data + (frame*width*height*vid_bytesperpixel));
-	TBlit(x, y, container, dest);
+	byte *c = (byte *) imagedata + ((frame + (selected*96)) * width * height);
+	TCopySprite8(x, y, width, height, c);
 }
 
 void FNT::Print(int x, int y, char *str, ...)
@@ -68,11 +83,35 @@ void FNT::Print(int x, int y, char *str, ...)
 
 	while (*str)
 	{
-		Render(x, y, (*str-32)+(selected*96), myscreen);
+		byte c = *str++;
+		switch (c)
+		{
+			case 126: selected=0; continue;
+			case 128: selected=1; continue;
+			case 129: selected=2; continue;
+			case 130: selected=3; continue;
+		}
+		Render(x, y, c-32, myscreen);
 		x += width;
-		str++;
+		
 	}
+}
 
+void FNT::PrintRaw(int x, int y, char *str)
+{
+	while (*str)
+	{
+		byte c = *str++;
+		switch (c)
+		{
+			case 126: selected=0; continue;
+			case 128: selected=1; continue;
+			case 129: selected=2; continue;
+			case 130: selected=3; continue;
+		}
+		Render(x, y, c-32, myscreen);
+		x += width;		
+	}
 }
 
 /********************* v2 fontbay crap *********************/
@@ -96,6 +135,6 @@ int LoadFont(char *fname)
 
 void PrintText(int font, char *str)
 {
-	if (font > numfonts) err("PrintText: Requested font out of range.");	
-	fnts[font]->Print(my_x, my_y, str);
+	if (font > numfonts) err("PrintText: Requested font out of range.");
+	fnts[font]->PrintRaw(my_x, my_y, str);
 }

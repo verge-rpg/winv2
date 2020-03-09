@@ -71,11 +71,35 @@ MAP::MAP(char *fname)
 	// # entities..
 	vread(&nents, 1, f);
 	
+	// store file-offset of entity structs; skip past them to read in movescripts
+	int entityofs = vtell(f);
+	vseek(f, nents * sizeof entity_r, 1);
+
+	char nms, *ms;
+	int msbuf[256];
+	vread(&nms, 1, f);
+	vread(&i, 4, f);
+	vread(msbuf, nms*4, f);
+	if (nms)
+	{
+		ms=(char *) malloc(i);
+		vread(ms, i, f);
+	}
+	else
+	{
+		vseek(f, i, 0);
+		ms=(char *) malloc(16);
+	}
+
+	int postscripts = vtell(f);
+	vseek(f, entityofs, 0);
+
 	for (i=0; i<nents; i++)
 	{
 		entity_r e;
 		vread(&e, sizeof entity_r, f);
 		int z = AllocateEntity(e.x * 16, e.y * 16, chrlist[e.chrindex].t);
+		entity[z]->actscript = e.actscript;
 		switch (e.speed)
 		{
 			case 0: entity[z]->setspeed(0); break;
@@ -88,23 +112,19 @@ MAP::MAP(char *fname)
 			case 7: entity[z]->setspeed(400); break;
 			default: err("MAP::MAP() - entity %d invalid speed %d", i, e.speed);
 		}
+		switch (e.movecode)
+		{
+			case 0: break;
+			case 1: entity[i]->set_wander(0, 0, layer[0].sizex-1, layer[0].sizey-1, e.step, e.delay); break;			
+			case 2: entity[i]->set_wanderzone(e.step, e.delay); break;
+			case 3: entity[i]->set_wander(e.data2, e.data3, e.data5, e.data6, e.step, e.delay); break;
+			case 4: entity[i]->set_movescript(&ms[msbuf[e.movescript]]); break;
+			default: break;// Blargh. err()ing here causes zeux to break. just leave movecode 0
+		}
 	}
+	free(ms);
+	vseek(f, postscripts, 0);
 
-char nms;
-char msbuf[1024];
-	vread(&nms, 1, f);
-	vread(&i, 4, f);
-	vread(msbuf, nms*4, f);
-	if (nms)
-	{
-		char *ms=(char *) malloc(i);
-		vread(ms, i, f);
-	}
-	else
-	{
-		vseek(f, i, 0);
-		char *ms=(char *) malloc(16);
-	}
 	vread(&i, 4, f); // # of things
 	current_map = this;
 
@@ -237,7 +257,7 @@ void MAP::BlitBackLayer(byte l, image *dest, int tx, int ty, int xwin, int ywin)
 				c = 0;
 			else
 				c = layers[l][(((ytc + i) * layer[l].sizex) + xtc + j)];
-			vsp -> Blit((j * 16) + xofs, (i * 16) + yofs, c, dest);
+			vsp->blit((j * 16) + xofs, (i * 16) + yofs, c, dest);
 		}
 	curlayer++;
 }
@@ -266,10 +286,10 @@ void MAP::BlitTransLayer(byte l, image *dest, int tx, int ty, int xwin, int ywin
 			if (layer[l].trans)
 			{
 				SetLucent(50);
-				if (c) vsp -> TBlit((j * 16) + xofs, (i * 16) + yofs, c, dest);
+				if (c) vsp->tblit((j * 16) + xofs, (i * 16) + yofs, c, dest);
 				SetLucent(0);
 			}
-			else if (c) vsp -> TBlit((j * 16) + xofs, (i * 16) + yofs, c, dest);
+			else if (c) vsp->tblit((j * 16) + xofs, (i * 16) + yofs, c, dest);
 		}
 	curlayer++;
 }
@@ -282,7 +302,7 @@ void MAP::BlitLayer(byte c, image *dest, int tx, int ty, int xwin, int ywin)
 
 void MAP::BlitObs(image *dest, int tx, int ty, int xwin, int ywin)
 {
-	int i, j;
+	int i, j, c;
 	int oxw, oyw, xofs, yofs, xtc, ytc;
 
 	oxw = xwin;
@@ -296,7 +316,8 @@ void MAP::BlitObs(image *dest, int tx, int ty, int xwin, int ywin)
 	for (i = 0; i < ty; i++)
 		for (j = 0; j< tx; j++)
 		{
-		
+			c = Obstruct[(((ytc + i) * layer[0].sizex) + xtc + j)];
+			if (c) Rect((j * 16) + xofs, (i * 16) + yofs, (j * 16) + xofs + 15, (i * 16) + yofs + 15, 0, dest);
 		}
 	SetLucent(0);
 	curlayer++;
@@ -343,4 +364,5 @@ void MAP::Render(int x, int y, image *dest)
 	    }
 		src++;
 	}
+	//BlitObs(dest, tx, ty, x, y);
 }

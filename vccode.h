@@ -37,10 +37,9 @@
 
 // Variable types.
 
-#define v_IMMEDIATE           1  // is this necessary?
-#define v_CHAR                2
-#define v_PTR                 3
-#define v_INT                 4
+#define v_INT		          1 
+#define v_FLOAT               2
+#define v_STRING              3
 
 // IF relational operators.
 

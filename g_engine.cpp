@@ -10,12 +10,14 @@
 Entity *entity[256];
 int entities=0, player;
 int cameratracking=1, tracker=0;
-MAP *current_map;
+MAP *current_map=0;
 Entity *myself;
 int xwin, ywin;
 bool done;
 
 /****************************** code ******************************/
+
+int gaytbl[] = { 1, 0, 2, 3 };
 
 Entity::Entity()
 {
@@ -28,13 +30,16 @@ Entity::Entity()
 	follow = 0;
 	follower = 0;
 	setspeed(100);
-	face = SOUTH;
+	face = 0;
 	framect = 0;
 	specframe = 0;
 	movestr[0] = 0;
 	moveofs = 0;
 	movecode = 0;
+	animdelay = 0;
+	actscript = 0;
 	visible = true;
+	active = true;
 }
 
 Entity::~Entity() { return; }
@@ -43,6 +48,8 @@ int Entity::gety() { return y / 65535; }
 
 void Entity::setxy(int x1, int y1)
 {
+	if (x1>65535) x1 = 64000;
+	if (y1>65535) y1 = 64000;
 	x = x1 * 65535;
 	y = y1 * 65535;
 	set_waypoint(x1, y1);
@@ -56,7 +63,7 @@ void Entity::setspeed(int s)
 	if (follower) follower->setspeed(s);
 }
 
-void Entity::setchr(CHR *c) { chr = c; }
+void Entity::setchr(CHR *c) { chr = c; set_face(SOUTH); }
 int Entity::get_waypointx() { return waypointx; }
 int Entity::get_waypointy() { return waypointy; }
 
@@ -116,8 +123,7 @@ void Entity::move_tick()
 	int dx = waypointx - getx();
 	int dy = waypointy - gety();
 
-	framect++;
-	if (framect >= 80) framect = 0;
+	thinkanim();
 
 	if (!(getx() % 16) && !(gety() % 16) && follower)
 			follower -> set_waypoint(getx(), gety());
@@ -135,20 +141,75 @@ void Entity::move_tick()
 	}
 
 	// Horizontal and vertical movement components
-//	x += sgn(dx) * 46340;
-//	y += sgn(dy) * 46340;
 	x += sgn(dx) * 65535;
 	y += sgn(dy) * 65535;
+}
+
+int Entity::GetArg()
+{
+	static char	token[10];
+
+	while (*animofs == ' ')
+		animofs++;
+
+	int n = 0;
+	while (*animofs >= '0' && *animofs <= '9')
+		token[n++] = *animofs++;
+	token[n] = 0;
+
+	return atoi(token);
+}
+
+void Entity::thinkanim()
+{
+	if (!chr) 
+		return;
+
+	if (animdelay)
+	{
+		animdelay--;
+		return;
+	}
+	
+	while (*animofs == ' ')
+	    animofs++;
+
+	switch (*animofs++)
+	{
+		case 'f':
+		case 'F':
+			framect = GetArg();
+			break;
+		case 'w':
+		case 'W':
+			animdelay = GetArg();
+			break;
+		case 0:
+			switch (face)
+			{
+				case SOUTH: animofs = chr->danim; break;
+				case NORTH: animofs = chr->uanim; break;
+				case WEST:  animofs = chr->lanim; break;
+				case EAST:  animofs = chr->ranim; break;
+			}
+			break;
+	}
 }
 
 void Entity::think()
 {
 	int num_ticks;
 
-	if (delay)
+	if (!active) return;
+	if (delay>systemtime)
 	{		
-		framect = 0;
-		delay--;
+		switch (face)
+		{
+			case SOUTH: animofs = chr->danim; break;
+			case NORTH: animofs = chr->uanim; break;
+			case WEST:  animofs = chr->lanim; break;
+			case EAST:  animofs = chr->ranim; break;
+		}
 		return;
 	}
 
@@ -163,9 +224,10 @@ void Entity::think()
 		if (ready())
 			switch (movecode)
 			{
-				case 0: return;
-				case 1: do_movescript(); break;
-				case 2: do_wander(); break;
+				case 0: return;				
+				case 1: do_wander(); break;
+				case 2: do_wanderzone(); break;
+				case 4: do_movescript(); break;
 				default: err("Entity::think(), unknown movecode value");
 			}
 		if (!ready())
@@ -176,64 +238,80 @@ void Entity::think()
 void Entity::draw()
 {
 	int frame;
-
 	if (!visible) return;
 
 	if (specframe)
 		frame = specframe;
-	else 
+	else if (chr)
 	{
 		switch (face)
 		{
-			case SOUTH:	frame = 0; break;
-			case NORTH:	frame = 5; break;
-			case WEST: frame = 10; break;
-			case EAST: frame = 15; break;
-			default: err("Entity::draw(), unknown FACE value");
+			case SOUTH:	frame = chr->idle[0]; break;
+			case NORTH:	frame = chr->idle[1]; break;
+			case WEST: frame = chr->idle[3]; break;
+			case EAST: frame = chr->idle[2]; break;
+			default: err("Entity::draw(), unknown FACE value (%d)", face);
 		}
-
-		if (framect >= 10 && framect < 20) frame += 1;
-		if (framect >= 20 && framect < 30) frame += 2;
-		if (framect >= 30 && framect < 40) frame += 1;
-		if (framect >= 50 && framect < 60) frame += 3;
-		if (framect >= 60 && framect < 70) frame += 4;
-		if (framect >= 70 && framect < 80) frame += 3;
+		if (!ready()) frame = framect;
 	}
 
 	int zx = getx() - xwin,
 		zy = gety() - ywin;
 
 	if (chr)
-		chr -> Render(zx, zy, frame, myscreen);
+		chr->Render(zx, zy, frame, myscreen);
 	else
 		Rect(zx, zy, zx + 15, zy + 15, 0, myscreen);
 }
 
-void Entity::set_face(int d) { face = d; }
+void Entity::set_face(int d) 
+{ 
+	if (face == d) return;
+	face = d; 
+	framect = 0;
+	animdelay = 0;
+	switch (d)
+	{
+		case SOUTH: animofs = chr->danim; break;
+		case NORTH: animofs = chr->uanim; break;
+		case WEST:  animofs = chr->lanim; break;
+		case EAST:  animofs = chr->ranim; break;
+	}
+	thinkanim();
+}
+
 int  Entity::get_face() { return face; }
-void Entity::stopanim() { framect = 0; }
-void Entity::stop() { set_waypoint(getx(), gety()); framect = 0; }
+void Entity::stopanim() { framect = 0; animdelay = 0; }
+void Entity::stop() { set_waypoint(getx(), gety()); framect = 0; movecode = 0; }
 
 void Entity::set_movescript(char *s)
 {
 	strcpy(movestr, s);
 	moveofs = 0;
-	movecode = 1;
+	movecode = 4;
 }
 
 void Entity::set_wander(int x1, int y1, int x2, int y2, int step, int delay)
 {
-/*	wx1 = x1;
+	wx1 = x1;
 	wy1 = y1;
-	wx2 = x2;
+	wx2 = x2; 
 	wy2 = y2;
 	wstep = step;
 	wdelay = delay;
-	movecode = 2;*/
+	movecode = 1;
+}
+
+void Entity::set_wanderzone(int step, int delay)
+{
+	wstep = step;
+	wdelay = delay;
+	movecode = 2;
 }
 
 void Entity::do_movescript()
 {
+	static char vc2me[] = { 2, 1, 3, 4 };
 	int arg;
 
 	while ((movestr[moveofs] >= '0' && movestr[moveofs] <= '9') || movestr[moveofs] == ' ')
@@ -241,18 +319,22 @@ void Entity::do_movescript()
 	switch(toupper(movestr[moveofs]))
 	{
 		case 'L': moveofs++;
+				  if (face != WEST) set_face(WEST);
 				  arg = atoi(&movestr[moveofs]);
 				  set_waypoint_relative(-arg*16, 0);
 				  break;
 		case 'R': moveofs++;
+				  if (face != EAST) set_face(EAST);
 				  arg = atoi(&movestr[moveofs]);
 				  set_waypoint_relative(arg*16, 0);
 				  break;			
 		case 'U': moveofs++;
+			      if (face != NORTH) set_face(NORTH);
 				  arg = atoi(&movestr[moveofs]);
 				  set_waypoint_relative(0, -arg*16);
 				  break;
 		case 'D': moveofs++;
+				  if (face != SOUTH) set_face(SOUTH);
 				  arg = atoi(&movestr[moveofs]);
 				  set_waypoint_relative(0, arg*16);
 				  break;
@@ -260,10 +342,10 @@ void Entity::do_movescript()
 				  setspeed(atoi(&movestr[moveofs]));
 				  break;
 		case 'W': moveofs++;
-				  delay = atoi(&movestr[moveofs]);
+				  delay = systemtime + atoi(&movestr[moveofs]);
 				  break;
 		case 'F': moveofs++;
-				  face = atoi(&movestr[moveofs]);
+				  set_face(vc2me[atoi(&movestr[moveofs])]);
 				  break;
 		case 'B': moveofs = 0; break;
 		case 'X': moveofs++;
@@ -284,9 +366,12 @@ void Entity::do_movescript()
 
 void Entity::do_wander()
 {
-/*	bool ub=false, db=false, lb=false, rb=false;
+	bool ub=false, db=false, lb=false, rb=false;
 	int ex = getx()/16;
 	int ey = gety()/16;
+
+	if (ex==31)
+		ex=31;
 
 	if (EntityObstructed(ex+wstep, ey) || ex+wstep > wx2) rb=true;
 	if (EntityObstructed(ex-wstep, ey) || ex-wstep < wx1) lb=true;
@@ -295,7 +380,7 @@ void Entity::do_wander()
 
 	if (rb && lb && db && ub) return; // Can't move in any direction
 
-	delay = wdelay;
+	delay = systemtime + wdelay;
 	while (1)
 	{
 		int i = rnd(0,3);
@@ -318,7 +403,47 @@ void Entity::do_wander()
 				set_waypoint_relative(0, -wstep*16);
 				return;
 		}
-	}*/
+	}
+}
+
+void Entity::do_wanderzone()
+{
+	bool ub=false, db=false, lb=false, rb=false;
+	int ex = getx()/16;
+	int ey = gety()/16;
+	int myzone = current_map->zone(ex, ey);
+
+	if (EntityObstructed(ex+wstep, ey) || current_map->zone(ex+wstep, ey) != myzone) rb=true;
+	if (EntityObstructed(ex-wstep, ey) || current_map->zone(ex-wstep, ey) != myzone) lb=true;
+	if (EntityObstructed(ex, ey+wstep) || current_map->zone(ex, ey+wstep) != myzone) db=true;
+	if (EntityObstructed(ex, ey-wstep) || current_map->zone(ex, ey-wstep) != myzone) ub=true;
+
+	if (rb && lb && db && ub) return; // Can't move in any direction
+
+	delay = systemtime + wdelay;
+	while (1)
+	{
+		int i = rnd(0,3);
+		switch (i)
+		{
+			case 0:
+				if (rb) break;
+				set_waypoint_relative(wstep*16, 0);
+				return;
+			case 1:
+				if (lb) break;
+				set_waypoint_relative(-wstep*16, 0);
+				return;
+			case 2:
+				if (db) break;
+				set_waypoint_relative(0, wstep*16);
+				return;
+			case 3:
+				if (ub) break;
+				set_waypoint_relative(0, -wstep*16);
+				return;
+		}
+	}
 }
 
 /**************************************************************************/
@@ -332,16 +457,49 @@ int AllocateEntity(int x, int y, char *chr)
 	return entities++;
 }
 
+static int _cdecl cmpent(const void* a, const void* b)
+{
+	return entity[*(byte*)a]->gety() - entity[*(byte*)b]->gety();
+}
+
 void RenderEntities()
 {
+	static byte entidx[256];
+	int entnum = 0;
+
+	// Build a list of entities that are onscreen/visible.
+	// FIXME: Make it actually only be entities that are onscreen
 	for (int i=0; i<entities; i++)
-		entity[i]->draw();
+		entidx[entnum++]=i;
+
+	// Ysort that list, then draw.	
+	qsort(entidx, entnum, 1, cmpent);
+	for (i=0; i<entnum; i++)
+		entity[entidx[i]]->draw();
 }
 
 void ProcessEntities()
 {
 	for (int i=0; i<entities; i++)
 		entity[i]->think();
+}
+
+int EntityAt(int x, int y)
+{
+	for (int i=0; i<entities; i++)
+		if (entity[i]->get_waypointx()/16 == x &&
+			entity[i]->get_waypointy()/16 == y)
+			return i;
+	return -1;
+}
+
+bool EntityObstructed(int ex, int ey)
+{
+	if (current_map->obstructed(ex, ey)) 
+		return true;
+	if (EntityAt(ex, ey) != -1)
+		return true;
+	return false;
 }
 
 bool PlayerObstructed(int d)
@@ -368,9 +526,11 @@ bool PlayerObstructed(int d)
 			break;
 	}
 
-	if (!current_map->obstructed(ex, ey)) 
-		return false;
-	return true;
+	if (current_map->obstructed(ex, ey)) 
+		return true;
+	if (EntityAt(ex, ey) != -1)
+		return true;
+	return false;
 }
 
 void CheckZone()
@@ -387,30 +547,93 @@ void ProcessControls()
 
 	if (!myself || !myself->ready()) return;
 	
-	if (up && !PlayerObstructed(NORTH))
+	if (up)
 	{
-		myself->set_waypoint_relative(0, -16);
-		return;
+		myself->set_face(NORTH);
+		if (!PlayerObstructed(NORTH))
+		{
+			myself->set_waypoint_relative(0, -16);
+			return;
+		}
 	}
-	if (down && !PlayerObstructed(SOUTH))
+	if (down)
 	{
-		myself->set_waypoint_relative(0, 16);
-		return;
+		myself->set_face(SOUTH);
+		if (!PlayerObstructed(SOUTH))
+		{
+			myself->set_waypoint_relative(0, 16);
+			return;
+		}
 	}
-	if (left && !PlayerObstructed(WEST))
+	if (left)
 	{
-		myself->set_waypoint_relative(-16, 0);
-		return;
+		myself->set_face(WEST);
+		if (!PlayerObstructed(WEST))
+		{
+			myself->set_waypoint_relative(-16, 0);
+			return;
+		}
+	}	
+	if (right)
+	{
+		myself->set_face(EAST);
+		if (!PlayerObstructed(EAST))
+		{
+			myself->set_waypoint_relative(16, 0);
+			return;
+		}
 	}
-	if (right && !PlayerObstructed(EAST))
+	if (b1)
 	{
-		myself->set_waypoint_relative(16, 0);
-		return;
+		int ex, ey;
+		switch (myself->face)
+		{
+			case NORTH: 
+				ex = myself->getx() / 16; 
+				ey = (myself->gety() / 16) - 1; 
+				break;
+			case SOUTH:
+				ex = myself->getx() / 16; 
+				ey = (myself->gety() / 16) + 1; 
+				break;
+			case WEST:			
+				ex = (myself->getx() / 16) - 1; 
+				ey = myself->gety() / 16; 
+				break;
+			case EAST:			
+				ex = (myself->getx() / 16) + 1; 
+				ey = myself->gety() / 16; 
+				break;
+		}	
+		int i = EntityAt(ex, ey);
+		if (i != -1 && entity[i]->actscript)
+		{
+			UnB1();
+			switch (myself->face)
+			{
+				case NORTH: entity[i]->face = SOUTH; break;
+				case SOUTH: entity[i]->face = NORTH; break;
+				case WEST: entity[i]->face = EAST; break;					
+				case EAST: entity[i]->face = WEST; break;
+			}	
+			ExecuteEvent(entity[i]->actscript);
+			return;
+		}
+		int cz = current_map->zone(ex, ey);
+		if (current_map->zones[cz].script)
+		{
+			UnB1();
+			ExecuteEvent(current_map->zones[cz].script);			
+		}
 	}
 }
 
 void Render()
 {
+	if (!current_map) return;
+	int rmap = (current_map->mapwidth() * 16);
+	int dmap = (current_map->mapheight() * 16);
+	
 	switch (cameratracking)
 	{
 		case 0: 
@@ -422,12 +645,12 @@ void Render()
 				ywin = (myself->gety() + 8) - (myscreen->height / 2);
 			}
 			else xwin=0, ywin=0;
+			if (xwin + myscreen->width >= rmap)
+				xwin = rmap - myscreen->width;
+			if (ywin + myscreen->height >= dmap)
+				ywin = dmap - myscreen->height;
 			if (xwin < 0) xwin = 0;
 			if (ywin < 0) ywin = 0;
-/*				if (xwin + myscreen->width > rmap)
-				xwin = rmap - myscreen->width;
-			if (ywin + myscreen->height > dmap)
-				ywin = dmap - myscreen->height;*/
 			break;
 		case 2:
 			if (tracker>=entities)
@@ -440,9 +663,12 @@ void Render()
 				xwin = (entity[tracker]->getx() + 8) - (myscreen->width/2);
 				ywin = (entity[tracker]->gety() + 8) - (myscreen->height/2);
 			}
+			if (xwin + myscreen->width >= rmap)
+				xwin = rmap - myscreen->width;
+			if (ywin + myscreen->height >= dmap)
+				ywin = dmap - myscreen->height;
 			if (xwin < 0) xwin = 0;
-			if (ywin < 0) ywin = 0;
-			//fixme lower/right map bounds!
+			if (ywin < 0) ywin = 0;			
 			break;
 	}	
 	current_map->Render(xwin, ywin, myscreen);
@@ -461,7 +687,7 @@ void Engine_Start(char *mapname)
 	player = -1;
 	myself = 0;
 	
-	xwin = ywin = 0;
+	xwin = ywin = 0;	
 	done = false;
 	checkzone = false;
 	kill = 0;
@@ -483,7 +709,7 @@ void Engine_Start(char *mapname)
 			timer--;
 		}
 		Render();
-		ShowPage();
+		ShowPage8();
 		Sleep(1);
 	}
 	delete current_map;

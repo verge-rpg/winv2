@@ -42,3 +42,4 @@ void vscanf(VFILE *f, char *format, int *dest);
 char vgetc(VFILE *f);
 word vgetw(VFILE *f);
 void vgets(char *str, int len, VFILE *f);
+int vtell(VFILE* f);

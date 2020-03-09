@@ -1009,9 +1009,6 @@ void LoadSystemVC()
 	int n;
 
 	log("Initializing VC interpreter");
-//	vcbuf = NewImage(320, 240);
-//	Clear(MakeColor(255,0,255), vcbuf);
-// FIXME
 	// open system variable and function index
 	f=vopen("system.xvc");
 	if (!f)
@@ -1117,10 +1114,7 @@ log("%s: mapevents %d,  codesize %d", mapname, mapevents, map_codesize);
 
 void FreeMapVC()
 {
-	/* clear out map key hooks */
-	for (int i=0; i<256; i++)
-		if (bindarray[i] < USERFUNC_MARKER)
-			bindarray[i] = 0;
+	memset(bindarray, 0, sizeof bindarray);
 
 	/* release memory */
 	delete[] event_offsets;
@@ -1172,8 +1166,11 @@ string GrabString()
 	return ret;
 }
 
+static int volume_hack = 100;
 int ReadInt(char category, int loc, int ofs)
 {
+	static char me2vc[] = { 0, 1, 0, 2, 3 };
+	
 	switch (category)
 	{
 	case op_UVAR:
@@ -1210,16 +1207,14 @@ int ReadInt(char category, int loc, int ofs)
 			case 20: return vctrack;
 			case 21: return width;
 			case 22: return depth;
-//			case 23: return 0; // volume
+			case 23: return volume_hack;  // FIXME: volume crap
 			case 24: return (int) current_map->vsp->vspspace;
-//			case 25: return 0; // lastent?? 
+			case 25: return 0; // lastent
 			case 26: return lastpressed;
 			case 27: return current_map->mapwidth();
 			case 28: return current_map->mapheight();
-//			case 29: return 0; // vsync?? ;P
+			case 29: return 0; // vsync?
 			case 30: return entities; 
-//			case 31: 
-//			case 32:
 			default: err("Unknown HVAR0 (%d)", loc); 
 		}
 	case op_HVAR1:
@@ -1249,7 +1244,7 @@ int ReadInt(char category, int loc, int ofs)
 				if (ofs<0 || ofs>=entities)
 					if (vc_paranoid) err("entity.facing: no such entity, pal. (%d)", ofs);
 					else return 0;
-				return entity[ofs]->face;
+				return me2vc[entity[ofs]->face];
 			case 6:
 				if (ofs<0 || ofs>=entities)
 					if (vc_paranoid) err("entity.moving: no such entity, pal. (%d)", ofs);
@@ -1260,24 +1255,51 @@ int ReadInt(char category, int loc, int ofs)
 					if (vc_paranoid) err("entity.specframe: no such entity, pal. (%d)", ofs);
 					else return 0;
 				return entity[ofs]->specframe;
-
-			case 9: return 0;
+			case 8:
+				if (ofs<0 || ofs>=entities) 
+					if (vc_paranoid) err("entity.speed: no such entity, pal. (%d)", ofs);
+					else return 0;
+				switch (entity[ofs]->getspeed())
+				{
+					case 0: return 0;
+					case 25: return 1;
+					case 33: return 2;
+					case 50: return 3;
+					case 100: return 4;
+					case 200: return 5;
+					case 300: return 6;
+					case 400: return 7;
+				}
+				return 0;
+			case 9: 
+				if (ofs<0 || ofs>=entities)
+					if (vc_paranoid) err("entity.movecode: no such entity, pal. (%d)", ofs);
+				else return 0;
+				return entity[ofs]->movecode;
 			case 11: return keys[ofs];
 
 			case 13: return (int) (*(byte *)ofs);
 			case 14: return (int) (*(word *)ofs);
 			case 15: return (int) (*(quad *)ofs);
 			case 16:
-				{
-					int rgb[3];
-					GetColor(pal[ofs/3], &rgb[0], &rgb[1], &rgb[2]);
-					return rgb[ofs%3]*63/255;
-				}
+				if (ofs<0 || ofs>768) return 0;
+				return base_pal8[ofs]*63/255;
+			case 17: return (int) (*(char *)ofs);
+			case 18: return (int) (*(short*)ofs);
+			case 19: return (int) (*(int  *)ofs);
+			case 20: return 1; // entity.isob
+			case 21: return 1; // entity.canob
+			case 22: return 1; // entity.autoface
 			case 23:
 				if (ofs<0 || ofs>=entities)
 					if (vc_paranoid) err("entity.visible: no such entity, pal. (%d)", ofs);
 					else return 0;
 				return entity[ofs]->visible ? 1 : 0;
+			case 24:
+				if (ofs<0 || ofs>=entities)
+					if (vc_paranoid) err("entity.on: no such entity, pal. (%d)", ofs);
+					else return 0;
+				return entity[ofs]->active ? 1 : 0;
 			default: err("Unknown HVAR1 (%d, %d)", loc, ofs);
 		}
 		break;
@@ -1294,6 +1316,7 @@ int ReadInt(char category, int loc, int ofs)
 
 void WriteInt(char category, int loc, int ofs, int value)
 {
+	static char vc2me[] = { 2, 1, 3, 4 };
 	switch (category)
 	{
 	case op_UVAR:
@@ -1311,7 +1334,11 @@ void WriteInt(char category, int loc, int ofs, int value)
 			case 1: ywin = value; return;
 			case 2: cameratracking = value; return;
 			case 3: vctimer = value; return;
+			case 14: player = value; return;
+			case 16: tracker = value; return;
 			case 20: vctrack = value; return;
+			case 23: volume_hack = value; return;
+			case 26: lastpressed = value; return;
 			default: err("Unknown HVAR0 (%d) (set %d)", loc, value);
 		}
 	case op_HVAR1:
@@ -1335,7 +1362,7 @@ void WriteInt(char category, int loc, int ofs, int value)
 				if (ofs<0 || ofs>=entities)
 					if (vc_paranoid) err("entity.facing: no such entity, pal. (%d)", ofs);
 					else return;
-				entity[ofs]->face = value;
+				entity[ofs]->face = vc2me[value];
 				return;
 			case 6:
 				if (ofs<0 || ofs>=entities)
@@ -1349,26 +1376,61 @@ void WriteInt(char category, int loc, int ofs, int value)
 					else return;
 				entity[ofs]->specframe = value;
 				return;
-
-			case 9: return; // entity movecode
+			case 8:
+				if (ofs<0 || ofs>=entities) 
+					if (vc_paranoid) err("entity.speed: no such entity, pal. (%d set: %d)", ofs, value);
+					else return;
+				switch (value)
+				{
+					case 0: entity[ofs]->setspeed(0);
+					case 1: entity[ofs]->setspeed(25);
+					case 2: entity[ofs]->setspeed(33);
+					case 3: entity[ofs]->setspeed(50);
+					case 4: entity[ofs]->setspeed(100);
+					case 5: entity[ofs]->setspeed(200);
+					case 6: entity[ofs]->setspeed(300);
+					case 7: entity[ofs]->setspeed(400);
+				}
+				return;
+			case 9: if (ofs<0 || ofs>=entities) 
+						if (vc_paranoid) err("entity.movecode: no such entity, pal. (%d set: %d)", ofs, value);
+					else return;
+				if (!value)
+					entity[ofs]->movecode = 0; 
+					return; 
 			case 11: keys[ofs] = value; return;
 
 			case 13: (*(byte *)ofs)=(byte) value; return;
 			case 14: (*(word *)ofs)=(word) value; return;
 			case 15: (*(quad *)ofs)=(quad) value; return;
-			case 16:
-				{
-					int rgb[3];
-					GetColor(pal[ofs/3], &rgb[0], &rgb[1], &rgb[2]);
-					rgb[ofs%3]=value*255/63;
-					pal[ofs/3] = MakeColor(rgb[0], rgb[1], rgb[2]);
-					return;
-				}
+			case 16: 
+				if (ofs<0 || ofs>768) return;
+				base_pal8[ofs] = value*255/63;
+				base_pal[ofs/3] = MakeColor(base_pal8[ofs*3], base_pal8[(ofs*3)+1], base_pal8[(ofs*3)+2]);
+				return;
+			case 17: (*(char *)ofs)=(byte) value; return;
+            case 18: (*(short*)ofs)=(word) value; return;
+            case 19: (*(int  *)ofs)=(quad) value; return;
+			case 20:
+				log("entity.isob set %d=%d", ofs, value);
+				return;
+			case 21:
+				log("entity.canob set %d=%d", ofs, value);
+				return;
+			case 22:
+				log("entity.autoface set %d=%d", ofs, value);
+				return;
 			case 23:
 				if (ofs<0 || ofs>=entities) 
 					if (vc_paranoid) err("entity.visible: no such entity, pal. (%d set: %d)", ofs, value);
 					else return;
 				entity[ofs]->visible = value ? true : false;
+				return;
+			case 24:
+				if (ofs<0 || ofs>=entities) 
+					if (vc_paranoid) err("entity.on: no such entity, pal. (%d set: %d)", ofs, value);
+					else return;
+				entity[ofs]->active = value ? true : false;
 				return;
 			default: err("Unknown HVAR1 (%d, %d) (set %d)", loc, ofs, value);
 		}
@@ -1653,10 +1715,10 @@ void HandleExternFunc()
 		{
 			switch (pfunc->argtype[n])
 			{
-				case 1:
+				case v_INT:
 					PushInt(ResolveOperand());
 					break;
-				case 3:
+				case v_STRING:
 					PushStr(ResolveString());
 					break;
 			}
@@ -1666,10 +1728,10 @@ void HandleExternFunc()
 		{
 			switch (pfunc->argtype[n])
 			{
-				case 1:
+				case v_INT:
 					PushInt(0);
 					break;
-				case 3:
+				case v_STRING:
 					PushStr("");
 					break;
 			}
@@ -1711,10 +1773,10 @@ void HandleExternFunc()
 		{
 			switch (pfunc->argtype[n])
 			{
-				case 1:
+				case v_INT:
 					PopInt();
 					break;
-				case 3:
+				case v_STRING:
 					PopStr();
 					break;
 			}
@@ -1991,10 +2053,10 @@ void ExecuteUserFunc(int ufunc)
 		{
 			switch (pfunc->argtype[n])
 			{
-				case 1:
+				case v_INT:
 					PushInt(ResolveOperand());
 					break;
-				case 3:
+				case v_STRING:
 					PushStr(ResolveString());
 					break;
 			}
@@ -2004,10 +2066,10 @@ void ExecuteUserFunc(int ufunc)
 		{
 			switch (pfunc->argtype[n])
 			{
-				case 1:
+				case v_INT:
 					PushInt(0);
 					break;
-				case 3:
+				case v_STRING:
 					PushStr("");
 					break;
 			}
@@ -2049,10 +2111,10 @@ void ExecuteUserFunc(int ufunc)
 		{
 			switch (pfunc->argtype[n])
 			{
-				case 1:
+				case v_INT:
 					PopInt();
 					break;
-				case 3:
+				case v_STRING:
 					PopStr();
 					break;
 			}
@@ -2076,15 +2138,6 @@ void HookRetrace()
 		ExecuteEvent(hookretrace);
 	if (hookretrace >= USERFUNC_MARKER)
 		ExecuteUserFunc(hookretrace-USERFUNC_MARKER);
-}
-
-void CheckHookTimer()
-{
-/*	while (hktimer)
-	{
-		HookTimer();
-		hktimer--;
-	} */
 }
 
 void HookTimer()

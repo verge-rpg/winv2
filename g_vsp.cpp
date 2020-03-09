@@ -3,21 +3,18 @@
 	g_vsp.cpp
  ****************************************************************/
 
-// FIXME: At some juncture this could probably stand to be just totally rewritten.
-
 #include "xerxes.h"
 #define  VSP_8BPP_UNCOMPRESSED 2
 #define  VSP_8BPP_BYTECOMPRESSED 3
 
-quad pal[256];
-quad base_pal[256];
-
 VSP::VSP(char *fname)
 {
 	numtiles = 0;
+	vspspace = 0;
 	LoadVSP(fname);
 	memcpy(base_pal, pal, sizeof pal);
-	mytimer = systemtime;
+	memcpy(base_pal8, pal8, sizeof pal8);
+	mytimer = systemtime;	
 }
 
 VSP::~VSP(void)
@@ -30,8 +27,7 @@ VSP::~VSP(void)
 void VSP::LoadVSP(char *fname)
 {
 	VFILE *f;
-	word ver;
-	byte pal1[768];
+	word ver;	
 	byte *cb;
 	int i;
 	
@@ -42,20 +38,20 @@ void VSP::LoadVSP(char *fname)
 	switch (ver)
 	{
 		case VSP_8BPP_UNCOMPRESSED: /* uncompressed 8bpp V1/V2 VSP */
-			vread(pal, 768, f);
+			vread(pal8, 768, f);
 			vread(&numtiles, 2, f);
 			vspspace = new byte[numtiles * 256];
 			vread(vspspace, numtiles * 256, f);
 			LoadAnimation(f);
 			vclose(f);			
 			for (i = 0; i < 768; i++)
-				pal1[i] = pal1[i] * 255 / 63;
+				pal8[i] = pal8[i] * 255 / 63;
 			for (i = 0; i < 256; i++)
-				pal[i] = MakeColor(pal1[i * 3], pal1[(i * 3) + 1], pal1[(i * 3) + 2]);
+				pal[i] = MakeColor(pal8[i * 3], pal8[(i * 3) + 1], pal8[(i * 3) + 2]);
 			break;
 
 		case VSP_8BPP_BYTECOMPRESSED: /* compressed 8bpp V2 VSP */
-			vread(&pal1, 768, f);
+			vread(&pal8, 768, f);
 			vread(&numtiles, 2, f);
 			vread(&i, 4, f);
 			vspspace = new byte[numtiles * 256];
@@ -64,14 +60,13 @@ void VSP::LoadVSP(char *fname)
 			DecodeByteCompression((byte *) vspspace, 256 * numtiles, (byte *) cb);
 			delete cb;
 			for (i = 0; i < 768; i++)
-				pal1[i] = pal1[i] * 255 / 63;
+				pal8[i] = pal8[i] * 255 / 63;
 			for (i = 0; i < 256; i++)
-				pal[i] = MakeColor(pal1[i * 3], pal1[(i * 3) + 1], pal1[(i * 3) + 2]);
-		
+				pal[i] = MakeColor(pal8[i * 3], pal8[(i * 3) + 1], pal8[(i * 3) + 2]);		
 			LoadAnimation(f);
 			vclose(f);
 			break;
-		default: err("VSP::LoadVSP16, unsupported VSP format");
+		default: err("VSP::LoadVSP, unsupported VSP format");
 	}
 }
 
@@ -90,34 +85,38 @@ void VSP::LoadAnimation(VFILE *f)
 	}
 }
 
-void VSP::Blit(int x, int y, int tile, image *dest)
+void VSP::blit(int x, int y, int tile, image *dest)
 {
-	char *c;
-
-	while (mytimer<systemtime)
+	byte *c;
+	while (mytimer < systemtime)
 	{
 		CheckTileAnimation();
 		mytimer++;
 	}
 	tile = tileidx[tile];
 	if (tile >= numtiles) err("VSP::Blit(), tile %d exceeds (%d)", tile, numtiles);
-	c = (char *) vspspace + (tile * 256);
-	Blit8(x, y, c, 16, 16, pal, dest);
+	c = (byte *) vspspace + (tile * 256);
+	if (alpha==50)
+		CopySprite8_Lucent(x, y, 16, 16, c);
+	else
+		CopySprite8(x, y, 16, 16, c);
 }
 
-void VSP::TBlit(int x, int y, int tile, image *dest)
+void VSP::tblit(int x, int y, int tile, image *dest)
 {
-	char *c;
-
-	while (mytimer<systemtime)
+	byte *c;
+	while (mytimer < systemtime)
 	{
 		CheckTileAnimation();
 		mytimer++;
 	}
 	tile = tileidx[tile];
 	if (tile >= numtiles) err("VSP::TBlit(), tile %d exceeds (%d)", tile, numtiles);
-	c = (char *) vspspace + (tile * 256);
-	TBlit8(x, y, c, 16, 16, pal, dest);
+	c = (byte *) vspspace + (tile * 256);
+	if (alpha==50)
+		TCopySprite8_Lucent(x, y, 16, 16, c);
+	else
+		TCopySprite8(x, y, 16, 16, c);
 }
 
 void VSP::DecodeByteCompression(byte *dest, int len, byte *buf)

@@ -9,25 +9,23 @@
 
 CHR::CHR(char *fname)
 {
-	byte *imagedata;
 	VFILE *f = vopen(fname);
 	if (!f) err("CHR::CHR(), could not open %s", fname);
 
+	fxsize=fysize=hx=hy=hw=hh=totalframes=0;
+
 	byte ver;
 	vread(&ver, 1, f);
-    if (ver != 2) //&& ver !=4)
-		err("%s incorrect CHR  version.", fname);
-//        if (!hicolor && ver==4)
-//                Sys_Error("Hicolor CHRs can't be loaded when in 8bit mode");
-	vread(&fxsize, 2, f);
-	vread(&fysize, 2, f);
-	vread(&hx, 2, f);
-	vread(&hy, 2, f);
-	vread(&hw, 2, f);
-	vread(&hh, 2, f);
-
-    if (ver == 2)
-    {
+	
+	if (ver == 2)
+	{
+		vread(&fxsize, 2, f);
+		vread(&fysize, 2, f);
+		vread(&hx, 2, f);
+		vread(&hy, 2, f);
+		vread(&hw, 2, f);
+		vread(&hh, 2, f);
+    
 		int n;
         vread(&totalframes, 2, f);
         vread(&n, 4, f);
@@ -36,62 +34,40 @@ CHR::CHR(char *fname)
         imagedata = new byte[fxsize * fysize * totalframes]; 
         
         n = uncompress(imagedata, fxsize * fysize * totalframes, ptr);
-        if (n)
-			err("LoadCHR: %s: bogus compressed image data", fname);
+        if (n) err("LoadCHR: %s: bogus compressed image data", fname);
                 
         delete[] ptr;
-/*        
-                if (hicolor)
-                {
-                        unsigned short* _16 = new unsigned short [c->fxsize*c->fysize*c->totalframes];
-                        for (n=0; n<c->fxsize*c->fysize*c->totalframes; n++)
-                        {
-                                if (!c->imagedata[n])
-                                        _16[n] = (16 == hicolor) ? 0xF81F : 0x7C1F;
-                                else
-                                        _16[n] = LoToHi(c->imagedata[n]);
-                        }
-                        delete[] c->imagedata;
-                        c->imagedata = (byte *)_16;
-                }
-        */
-        
-        vread(&idle[2],4,f);
-        vread(&idle[3],4,f);
-        vread(&idle[1],4,f);
-        vread(&idle[0],4,f);
-        
+
+        vread(&idle[3], 4, f);
+        vread(&idle[2], 4, f);
+        vread(&idle[1], 4, f);
+        vread(&idle[0], 4, f);
+
         for (int b=0; b<4; b++)
         {
 			switch (b)
 			{
-					case 0: ptr=lanim; break;
-					case 1: ptr=ranim; break;
-					case 2: ptr=uanim; break;
-					case 3: ptr=danim; break;
+				case 0: ptr = lanim; break;
+				case 1: ptr = ranim; break;
+				case 2: ptr = uanim; break;
+				case 3: ptr = danim; break;
 			}
 			vread(&n, 4, f);
 			if (n>99)
 					err("Animation strand too long. %d", n);
 			vread(ptr, n, f);
 		}
-	}	
-	vclose(f);
 
-	rawdata = new image(fxsize, fysize * totalframes);
-	for (int i=0; i<fxsize*fysize*totalframes; i++)
-		PutPixel(i%fxsize, i/fxsize, imagedata[i] ? base_pal[imagedata[i]] : transColor, rawdata);
-	container = new image(fxsize, fysize);
-	delete[] container->data;
-	delete[] imagedata;
+	}
+	else
+		err("%s incorrect CHR version.", fname);
+	vclose(f);
 
 }
 
 CHR::~CHR()
 {
-	container->data = 0;
-	delete container;
-	delete rawdata;
+	delete[] imagedata;
 }
 
 int CHR::uncompress(byte* dest, int len, char *buf)
@@ -124,6 +100,6 @@ void CHR::Render(int x, int y, int frame, image *dest)
 	if (frame >= totalframes)
 		err("CHR::Render(), frame requested is undefined");
 
-	container->data = (void *) ((int) rawdata->data + (frame*fxsize*fysize*vid_bytesperpixel));
-	TBlit(x, y, container, dest);
+	byte *c = (byte *) imagedata + (frame * fxsize * fysize);
+	TCopySprite8(x, y, fxsize, fysize, c);
 }

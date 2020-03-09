@@ -24,6 +24,7 @@ public:
 extern int vid_bpp, vid_xres, vid_yres, vid_bytesperpixel, transColor;
 extern bool vid_window;
 extern image *screen;
+extern int alpha, ialpha;
 
 int dd_SetMode(int xres, int yres, int bpp, bool windowflag);
 int vid_SetMode(int xres, int yres, int bpp, int window, int mode);

@@ -57,7 +57,6 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE zwhocares, LPSTR szComman
 	InitKeyboard();
 	joy_Init();
 	timer_Init(100);
-	InitSound();
 	ShowCursor(0);
 
 	xmain(__argc,__argv);
@@ -110,9 +109,8 @@ LRESULT APIENTRY WndProc(HWND hWnd, UINT message,WPARAM wParam, LPARAM lParam)
 					err("");
 				return 0;
 			}
-		break;
+			return 0;
 
-			break;
 		case WM_KEYDOWN: return 0;
 		case WM_KEYUP: return 0;
 		case WM_LBUTTONDOWN: mouse_l = true; break; 

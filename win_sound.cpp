@@ -253,7 +253,7 @@ void InitSound()
     //  - We force dynamic sample support.  This is mostly a gesture of future expandability.
 
     md = Mikmod_Init(44010, 80, NULL, MD_STEREO, 0, DMODE_16BITS | DMODE_INTERP | DMODE_SAMPLE_DYNAMIC | DMODE_NOCLICK);
-
+	if (!md) sound = false, UseSound = false;
     // Blackstar voiceset organization:
     // Notes:
     // - The global voiceset has no voices since everything will be assignd to one
@@ -370,13 +370,33 @@ static bool loadmodule(const char *sng)
     // We don't know how long it could take to load the song,
     // so lets clear out the mixing buffer.
     Mikmod_WipeBuffers(md);
-        
+
+	bool real=true;
+	if (!Exist((char *) sng))
+	{
+		real = false;
+		FILE *f = fopen("mikmod_temp.$$$","wb");
+		VFILE *vf = vopen((char *) sng);
+		int l = filesize(vf);
+		char *buffer = new char[l];
+		vread(buffer, l, vf);
+		fwrite(buffer, 1, l, f);
+		vclose(vf);
+		fclose(f);
+	}
+
     // Load the song and add it to the list of loaded resources.
-    mf = Unimod_Load(md,sng);
+    if (real) 
+		mf = Unimod_Load(md,sng);
+	else
+		mf = Unimod_Load(md,"mikmod_temp.$$$");
     if (!mf)
     {   err("Could not load module %s", sng);
         return 1;
     }
+
+	if (!real)
+		remove("mikmod_temp.$$$");
     return 0;
 }
 
@@ -399,7 +419,9 @@ void PlayMusic(const char *sng, bool cache)
 	if (!UseSound) return;
 	if (!strlen(sng)) return;
 	if (!strcmp(sng, playingsng)) return;
-	
+	VFILE *f = vopen((char *)sng);
+	if (!f) return;
+	vclose(f);
     killmodule();
 
     strcpy(playingsng, sng);
@@ -543,15 +565,18 @@ MD_SAMPLE *CacheSample(SampleCache *sbank, const char *si)
     if(serm=FetchSample(sbank, si))
         mdsfx_duplicate(serm);
     else
-    {   serm  = mdsfx_loadwav(md, si);
+    { 
+		serm  = mdsfx_loadwav(md, si);
         SampleCache_NewEntry(sbank, si, serm);
     }
+	if (!serm) log("could not load sample: %s", si);
     return serm;
 }
 
 int PlaySample(MD_SAMPLE *s)
 {
     if (!UseSound) return 0;
+	if (!s) return 0;
     mdsfx_playeffect(s, vs_sndfx, 0, 0);
     return 0;
 }

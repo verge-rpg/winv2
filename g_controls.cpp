@@ -27,9 +27,9 @@ void UpdateControls()
 	if (keys[SCAN_RIGHT] || sticks[0].right) right = true; else right = false;
 
 	if (keys[SCAN_ENTER] || sticks[0].button[0]) b1 = true; else b1 = false;
-	if (keys[SCAN_SPACE] || sticks[0].button[1]) b2 = true; else b2 = false;
+	if (keys[SCAN_ALT] || sticks[0].button[1]) b2 = true; else b2 = false;
 	if (keys[SCAN_ESC] || sticks[0].button[2]) b3 = true; else b3 = false;
-	if (keys[SCAN_ALT] || sticks[0].button[3]) b4 = true; else b4 = false;
+	if (keys[SCAN_SPACE] || sticks[0].button[3]) b4 = true; else b4 = false;
 	
 	if (!up && kill_up) kill_up = false;
 	if (!down && kill_down) kill_down = false;

@@ -6,8 +6,6 @@ struct vspanim_r
   word mode;                         // tile-animation mode
 };
 
-extern quad pal[256], base_pal[256];
-
 class VSP
 {
 public:
@@ -16,11 +14,11 @@ public:
 
 	VSP(char *fname);
 	~VSP();
-	void Blit(int x, int y, int tile, image *dest);
-	void TBlit(int x, int y, int tile, image *dest);
+	void blit(int x, int y, int tile, image *dest);
+	void tblit(int x, int y, int tile, image *dest);
 	void CheckTileAnimation();
 
-	void *vspspace;
+	byte *vspspace;
 	int  bppmultiplier;
 	vspanim_r vspanim[100];
 	int vadelay[100];

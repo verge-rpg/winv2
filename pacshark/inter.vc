@@ -1,8 +1,0 @@
-event
-{
- Render();
- PaletteMorph(0,0,0,0,63);
- Intermission(stage);
- PaletteMorph(0,0,0,100,63);
- Map(right(str(stage+100),2)+".MAP");
-}

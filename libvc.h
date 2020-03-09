@@ -8,16 +8,16 @@ void EnforceNoDirectories(string s)
 	int	n = 0;        
 
     if (s[0]=='/' || s[0]=='\\')
-		err("OpenFile does not allow accessing dir: %s", s.c_str());
+		err("vc does not allow accessing dir: %s", s.c_str());
 
     if (s[1]==':')
-		err("OpenFile does not allow accessing dir: %s", s.c_str());
+		err("vc does not allow accessing dir: %s", s.c_str());
 
     n=0;
     while (n<s.length()-1)
     {
 		if (s[n]=='.' && s[n+1]=='.')
-			err("OpenFile does not allow accessing dir: %s", s.c_str());
+			err("vc does not allow accessing dir: %s", s.c_str());
 		n++;
     }
 }
@@ -31,7 +31,34 @@ void vc_Exit()
 void vc_Message()
 {
 	string message = ResolveString();
+	ResolveOperand();
 	log(message.c_str());
+}
+
+int malloced_crap[1024];
+int num_malloced_crap = 0;
+
+bool IsInThere(int ofs)
+{
+	for (int i=0; i<num_malloced_crap; i++)
+		if (malloced_crap[i] == ofs)
+			return true;
+	return false;
+}
+
+void RemoveMallocedThing(int ofs)
+{
+	for (int i=0; i<num_malloced_crap; i++)
+	{
+		if (malloced_crap[i] == ofs)
+		{
+			for (; i<num_malloced_crap-1; i++)
+				malloced_crap[i] = malloced_crap[i+1];
+			num_malloced_crap--;
+			return;
+		}
+	}
+	err("RemoveMallocedThing: internal error!");
 }
 
 void vc_Malloc()
@@ -39,14 +66,23 @@ void vc_Malloc()
 	int size = ResolveOperand();
 	if (!size) err("vc_Malloc: zero-sized block requested");
 	vcreturn = (int) malloc(size);
+	memset((void *) vcreturn, 0, size);
+	malloced_crap[num_malloced_crap++] = vcreturn;
+	if (num_malloced_crap == 1024)
+		err("vc_Malloc: malloced_crap[] overflow");
 	log("vc allocated %d bytes, ptr %d", size, vcreturn);	
 }
 
 void vc_Free()
 {
 	int ptr = ResolveOperand();
-	log("vc freed ptr at %d", ptr);	
-	//free((void*) ptr);	
+	bool kok = IsInThere(ptr);
+	if (!kok && vc_paranoid)
+		err("vc attempt to free invalid ptr %d", ptr);
+	if (!kok) return;	
+	log("vc freed ptr at %d", ptr);
+	free((void*) ptr);
+	RemoveMallocedThing(ptr);
 }
 
 void vc_pow()
@@ -60,7 +96,6 @@ void vc_LoadImage()
 {
 	string fname = ResolveString();
 	vcreturn = (int) xLoadImage8bpp(fname.c_str());
-	// FIXME: add some kind of image tracking?
 }
 
 void vc_CopySprite()
@@ -68,9 +103,12 @@ void vc_CopySprite()
 	int x = ResolveOperand();
 	int y = ResolveOperand();
 	int width = ResolveOperand();
-	int length = ResolveOperand();
+	int height = ResolveOperand();
 	int ptr = ResolveOperand();
-	Blit8(x, y, (char *) ptr, width, length, pal, myscreen);
+	if (Lucent)
+		CopySprite8_Lucent(x, y, width, height, (byte *) ptr);
+	else
+		CopySprite8(x, y, width, height, (byte *) ptr);
 }
 
 void vc_TCopySprite()
@@ -78,9 +116,13 @@ void vc_TCopySprite()
 	int x = ResolveOperand();
 	int y = ResolveOperand();
 	int width = ResolveOperand();
-	int length = ResolveOperand();
+	int height = ResolveOperand();
 	int ptr = ResolveOperand();
-	TBlit8(x, y, (char *) ptr, width, length, pal, myscreen);
+	if (Lucent)
+		TCopySprite8_Lucent(x, y, width, height, (byte *) ptr);
+	else
+		TCopySprite8(x, y, width, height, (byte *) ptr);
+
 }
 
 void vc_EntitySpawn()
@@ -124,6 +166,7 @@ void vc_PrintString()
 {
 	int font_slot = ResolveOperand();
 	string text = ResolveString();
+	
 	PrintText(font_slot, text.c_str());
 }
 
@@ -185,25 +228,6 @@ void vc_SetTile()
 	}
 }
 
-void vc_Unpress()
-{
-	int n = ResolveOperand();
-	switch (n)
-	{
-		case 0: UnB1(); UnB2(); UnB3(); UnB4();	break;
-		case 1: UnB1(); break;
-		case 2: UnB2(); break;
-		case 3: UnB3(); break;
-		case 4: UnB4(); break;
-		case 5: UnUp(); break;
-		case 6: UnDown(); break;
-		case 7: UnLeft(); break;
-		case 8: UnRight(); break;
-	}
-}
-
-
-
 void vc_ScaleSprite()
 {
 	int x		= ResolveOperand();
@@ -213,9 +237,38 @@ void vc_ScaleSprite()
 	int dwidth	= ResolveOperand();
 	int dheight = ResolveOperand();
 	int ptr		= ResolveOperand();
-	ScaleBlit8(x, y, dwidth, dheight, (byte *) ptr, swidth, sheight, pal, myscreen);
+	if (Lucent)
+		ScaleSprite8_Lucent(x, y, swidth, sheight, dwidth, dheight, (byte *) ptr);
+	else
+		ScaleSprite8(x, y, swidth, sheight, dwidth, dheight, (byte *) ptr);
 }
 
+void vc_Unpress()
+{
+	int n = ResolveOperand();
+	switch (n)
+	{
+		case 0: if (b1) UnB1(); if (b2) UnB2(); if (b3) UnB3(); if (b4) UnB4();	break;
+		case 1: if (b1) UnB1(); break;
+		case 2: if (b2) UnB2(); break;
+		case 3: if (b3) UnB3(); break;
+		case 4: if (b4) UnB4(); break;
+		case 5: if (up) UnUp(); break;
+		case 6: if (down) UnDown(); break;
+		case 7: if (left) UnLeft(); break;
+		case 8: if (right) UnRight(); break;
+	}
+}
+
+void vc_EntityMove()
+{
+	int ent_num = ResolveOperand();
+	string movestr = ResolveString();
+	if (ent_num >= entities && vc_paranoid)
+		err("vc_EntityMove: No such entity, pal. (%d)", ent_num);
+	entity[ent_num]->set_movescript(movestr.c_str());
+
+}
 
 void vc_HLine()
 {
@@ -223,7 +276,10 @@ void vc_HLine()
 	int y1 = ResolveOperand();
 	int x2 = ResolveOperand();
 	int c = ResolveOperand();
-	HLine(x1, y1, x2, pal[c], myscreen);
+	if (Lucent)
+		HLine8_Lucent(x1, y1, x2, c);
+	else
+		HLine8(x1, y1, x2, c);
 }
 
 void vc_VLine()
@@ -232,7 +288,10 @@ void vc_VLine()
 	int y1 = ResolveOperand();
 	int y2 = ResolveOperand();
 	int c = ResolveOperand();
-	VLine(x1, y1, y2, pal[c], myscreen);
+	if (Lucent)
+		VLine8_Lucent(x1, y1, y2, c);
+	else
+		VLine8(x1, y1, y2, c);
 }
 
 void vc_Line()
@@ -243,7 +302,7 @@ void vc_Line()
 	int x2 = ResolveOperand();
 	int y2 = ResolveOperand();
 	int c  = ResolveOperand();
-	Line(x1, y1, x2, y2, pal[c], myscreen);
+	Line8(x1, y1, x2, y2, c);
 }
 
 void vc_Circle()
@@ -252,7 +311,10 @@ void vc_Circle()
 	int y = ResolveOperand();
 	int radius = ResolveOperand();
 	int color = ResolveOperand();
-	Circle(x, y, radius, radius, pal[color], myscreen);
+	if (Lucent)
+		Circle8_Lucent(x, y, radius, radius, color);
+	else
+		Circle8(x, y, radius, radius, color);
 }
 
 void vc_CircleFill()
@@ -261,7 +323,10 @@ void vc_CircleFill()
 	int y = ResolveOperand();
 	int radius = ResolveOperand();
 	int color = ResolveOperand();
-	Sphere(x, y, radius, radius, pal[color], myscreen);
+	if (Lucent)
+		Sphere8_Lucent(x, y, radius, radius, color);
+	else
+		Sphere8(x, y, radius, radius, color);
 }
 
 void vc_Rect()
@@ -271,7 +336,7 @@ void vc_Rect()
 	int xe = ResolveOperand();
 	int ye = ResolveOperand();
 	int color = ResolveOperand();
-	Box(x, y, xe, ye, pal[color], myscreen);
+	Box8(x, y, xe, ye, color);
 }
 
 void vc_RectFill()
@@ -281,7 +346,10 @@ void vc_RectFill()
 	int xe = ResolveOperand();
 	int ye = ResolveOperand();
 	int color = ResolveOperand();
-	Rect(x, y, xe, ye, pal[color], myscreen);
+	if (Lucent)
+		Rect8_Lucent(x, y, xe, ye, color);
+	else
+		Rect8(x, y, xe, ye, color);
 }
 
 void vc_strlen()
@@ -320,12 +388,22 @@ void vc_SetPixel()
 	int x = ResolveOperand();
 	int y = ResolveOperand();
 	int c = ResolveOperand();
-	PutPixel(x, y, pal[c], myscreen);
+	PutPixel8(x, y, c);
 }
 
+void vc_GetPixel()
+{
+	int x = ResolveOperand();
+	int y = ResolveOperand();
+	vcreturn = (int) ReadPixel8(x, y);
+}
 
-
-
+void vc_EntityOnScreen()
+{
+	int find = ResolveOperand();
+	err("implement entityonscreen!!");
+	vcreturn = 0;
+}
 
 void vc_GetTile()
 {
@@ -336,14 +414,15 @@ void vc_GetTile()
 
 	if (x<0 || y<0)
 		return;
-	if (l<6 && (x >= current_map->layer[l].sizex || y >= current_map->layer[l].sizey))
+	if (l<6 && l >= current_map->numlayers && vc_paranoid)
+		err("vc_GetTile(): passing an nonexistant layer");
+	if (l<6 && (l >= current_map->numlayers || x >= current_map->layer[l].sizex || y >= current_map->layer[l].sizey))
  		return;
 	if (l==6 || l==7)
 	{
 		if (x>=current_map->mapwidth() || y>=current_map->mapheight())
 			return;
-	}
-	// FIXME:: fixme up more!!
+	}	
 	
 	switch (l)
 	{
@@ -382,8 +461,40 @@ void vc_HookRetrace()
 	hookretrace = script;
 }
 
+void vc_HookTimer()
+{
+	int script = 0;
+	switch (GrabC())
+	{
+		case 1:
+			script = ResolveOperand();
+			break;
+		case 2:
+			script = USERFUNC_MARKER + GrabD();
+			break;
+	}		
+	hooktimer = script;
+}
 
 
+void vc_SetResolution()
+{	
+	v2_xres = ResolveOperand();
+	v2_yres = ResolveOperand();
+
+	if (eagle)
+	{
+		delete myscreen;
+		vid_SetMode(v2_xres*2, v2_yres*2, vid_bpp, vid_window, MODE_SOFTWARE);
+		myscreen = new image(v2_xres, v2_yres);
+	}
+	else
+	{
+		vid_SetMode(v2_xres, v2_yres, vid_bpp, vid_window, MODE_SOFTWARE);
+		myscreen = screen;
+	}
+	Init8bpp();
+}
 
 void vc_SetRString()
 {
@@ -392,51 +503,65 @@ void vc_SetRString()
 }
 
 void vc_SetClipRect()
-{	
-	int x = ResolveOperand();
-	int y = ResolveOperand();
-	int xend = ResolveOperand();
-	int yend = ResolveOperand();
+{
+	clip_x = ResolveOperand();
+	clip_y = ResolveOperand();
+	clip_xend = ResolveOperand();
+	clip_yend = ResolveOperand();
 
-	if (x>xend) SWAP(x,xend);
-	if (y>yend) SWAP(y,yend);
+	if (clip_x < 0)
+		clip_x = 0;
+	else if (clip_x >= screen_width)
+		clip_x = screen_width - 1;
+	if (clip_y < 0)
+		clip_y = 0;
+	else if (clip_y >= screen_height)
+		clip_y = screen_height - 1;
 
-	if (x < 0) x = 0;
-	else if (x >= myscreen->width) x = myscreen->width - 1;
-	if (y < 0) y = 0;
-	else if (y >= myscreen->height) y = myscreen->height - 1;
-
-	if (xend<0) xend=0;
-	else if (xend>=myscreen->width) xend=myscreen->width - 1;
-	if (yend<0) yend=0;
-	else if (yend>=myscreen->height)
-		yend=myscreen->height - 1;
-
-	myscreen->SetClip(x, y, xend, yend);
+	if (clip_xend < 0)
+		clip_xend = 0;
+	else if (clip_xend >= screen_width)
+		clip_xend = screen_width - 1;
+	if (clip_yend < 0)
+		clip_yend = 0;
+	else if (clip_yend >= screen_height)
+		clip_yend = screen_height-1;	
 }
 
 void vc_SetRenderDest()
 {
+	screen_width = ResolveOperand();
+	screen_height = ResolveOperand();
+	clip_x = 0;
+	clip_y = 0;
+	clip_xend = screen_width - 1;
+	clip_yend = screen_height - 1;
+	screen8 = (byte *) ResolveOperand();
 }
 
 void vc_RestoreRenderSettings()
 {
-	myscreen->SetClip(0, 0, v2_xres-1, v2_yres-1);
+	screen_width = v2_xres;
+	screen_height = v2_yres;
+	clip_x = 0;
+	clip_y = 0;
+	clip_xend = screen_width - 1;
+	clip_yend = screen_height - 1;
+	screen8 = realscreen;
 }
 
 void vc_PartyMove()
 {
-	//myself=0;
+	if (!myself) err("vc_PartyMove: there is no player set!");
+	myself = 0;
+	vcpush(cameratracking);
+	vcpush(tracker);
 
-//	vcpush(cameratracking);
-//	vcpush(tracker);
-
-/*	if (1==cameratracking)
+	if (cameratracking == 1)
 	{
-		cameratracking=2;
-		tracker=playernum;
-	}*/
-err("");
+		cameratracking = 2;
+		tracker = player;
+	}
 	string movescript = ResolveString();
 	entity[player]->set_movescript(movescript.c_str());
 	
@@ -449,17 +574,40 @@ err("");
 			ProcessEntities();
 		}
 		Render();
-		ShowPage();
+		ShowPage8();
 	}
-
-//	tracker=(byte)vcpop();
-//	cameratracking=(byte)vcpop();
-
-//	player=&entity[playernum];
-	timer = 0;
+	
+	tracker = (byte) vcpop();
+	cameratracking = (byte) vcpop();
+	myself = entity[player];
+	timer = 1;
 }
 
+void vc_WrapBlit()
+{
+	int x = ResolveOperand();
+	int y = ResolveOperand();
+	int sw = ResolveOperand();
+	int sh = ResolveOperand();
+	byte *src = (byte *) ResolveOperand();
+	if (Lucent) 
+		WrapBlit8_Lucent(x, y, sw, sh, src);
+	else
+		WrapBlit8(x, y, sw, sh, src);
+}
 
+void vc_TWrapBlit()
+{
+	int x = ResolveOperand();
+	int y = ResolveOperand();
+	int sw = ResolveOperand();
+	int sh = ResolveOperand();
+	byte *src = (byte *) ResolveOperand();
+	if (Lucent) 
+		TWrapBlit8_Lucent(x, y, sw, sh, src);
+	else
+		TWrapBlit8(x, y, sw, sh, src);
+}
 
 void AdjustMousePos(int *x, int *y)
 {
@@ -506,32 +654,36 @@ void vc_PlayMusic()
 	PlayMusic(fname.c_str(), false);
 }
 
-
+int morph_step(int S, int D, int mix, int light)
+{
+	return (mix*(S - D) + (100*D))/100*light/64;
+}
 
 void vc_PaletteMorph()
 {	
-	image *hole = new image(1,1);
-	int r = ResolveOperand();
-	int g = ResolveOperand();
-	int b = ResolveOperand();
+	int	n, rgb[3];	
+
+	rgb[0] = ResolveOperand() * 255 / 63;
+	rgb[1] = ResolveOperand() * 255 / 63;
+	rgb[2] = ResolveOperand() * 255 / 63;
     int percent = ResolveOperand();
 	int intensity = ResolveOperand();
 
-    if (hicolor)
-		return;
-
     percent = 100-percent;
-	intensity = intensity * 100 / 64;
-	for (int i=0; i<256; i++)
+
+	for (n = 0; n < 3; n += 1)
 	{
-		PutPixel(0, 0, base_pal[i], hole);
-		SetLucent(percent);
-		PutPixel(0, 0, MakeColor(r, g, b), hole);
-		SetLucent(intensity);
-		PutPixel(0, 0, 0, hole);
-		pal[i] = ReadPixel(0, 0, hole);
-		SetLucent(0);
+		if (rgb[n] < 0)
+			rgb[n] = 0;
+		else if (rgb[n] > 255)
+			rgb[n] = 255;
 	}
+
+	for (n = 0; n < 3*256; n += 1)
+		pal8[n] = (byte) morph_step(base_pal8[n], rgb[n % 3], percent, intensity);
+
+	for (n=0; n<256; n++)
+		pal[n] = MakeColor(pal8[(n*3)], pal8[(n*3)+1], pal8[(n*3)+2]);
 }
 
 void vc_OpenFile()
@@ -541,17 +693,93 @@ void vc_OpenFile()
 
 	VFILE *vf = vopen(filename.c_str());
 	vcreturn = (quad) vf;
-
 	log(" --> VC opened file %s, ptr 0x%08X", filename.c_str(), (quad) vf);
+	malloced_crap[num_malloced_crap++] = (int) vf;
 }
 
 void vc_CloseFile()
 {		
 	VFILE *vf = (VFILE *) ResolveOperand();
+	if (!IsInThere((int) vf))
+	{
+		if (vc_paranoid) err("vc closed file that was not open: %d", (int) vf);
+		return;
+	}
 	vclose(vf);
+	RemoveMallocedThing((int) vf);
 	log(" --> VC closed file ptr 0x%08X", (quad) vf);
 }
 
+void vc_QuickRead()
+{
+	int offset;
+	char temp[256]={0};
+
+	string filename = ResolveString();
+	EnforceNoDirectories(filename);
+
+	// which string are we reading into?
+	char code = GrabC();
+	switch (code)
+	{
+		case op_STRING:
+			offset = GrabW();
+			break;
+		case op_SARRAY:
+			offset = GrabW();
+			offset += ResolveOperand();
+			break;
+		default:
+			err("vc_QuickRead: bad string operator!!!");
+	}
+
+	// which line are we reading from the file?
+	int seekline = ResolveOperand();
+	if (seekline < 1) seekline = 1;
+
+	VFILE* f = vopen(filename.c_str());
+	if (!f)
+		err("vc_QuickRead: could not open %s", filename.c_str());
+	
+	// seek to the line of interest
+	for (int n=0; n<seekline; n++)
+		vgets(temp, 255, f);
+
+	// suppress trailing CR/LF
+	char *p = temp;
+	while (*p)
+	{
+		if ('\n' == *p || '\r' == *p)
+			*p = '\0';
+		p++;
+	}
+
+	// assign to vc string
+	if (offset>=0 && offset<stralloc)
+		vc_strings[offset]=temp;
+
+	vclose(f);
+}
+
+void vc_AddFollower()
+{
+	int which = ResolveOperand();
+	if (which >= entities && vc_paranoid)
+		err("AddFollower: no such entity (%d)", which);
+	if (which >= entities) return;
+
+	if (!myself)
+	{
+		player = which;
+		myself = entity[player];
+		return;
+	}
+
+	Entity *cruise = myself;
+	while (cruise->getfollower())
+		cruise = cruise->getfollower();
+	cruise->stalk(entity[which]);
+}
 
 
 
@@ -580,6 +808,20 @@ void vc_PlaySound()
 	PlayMenuSample(samples[slot]);
 }
 
+void vc_RotScale()
+{
+	int x = ResolveOperand();
+	int y = ResolveOperand();
+	int width = ResolveOperand();
+	int length = ResolveOperand();
+	int angle = ResolveOperand();
+	int scale = ResolveOperand();
+	int ptr = ResolveOperand();
+	if (Lucent)
+		RotScale8_Lucent(x, y, width, length, angle*3.14159/180.0, scale/1000.0, (byte *)ptr);
+	else
+		RotScale8(x, y, width, length, angle*3.14159/180.0, scale/1000.0, (byte *)ptr);
+}
 
 void vc_val()
 {
@@ -587,6 +829,20 @@ void vc_val()
 	vcreturn = atoi(s.c_str());
 }
 
+void vc_TScaleSprite()
+{
+	int x		= ResolveOperand();
+	int y		= ResolveOperand();
+	int swidth	= ResolveOperand();
+	int sheight = ResolveOperand();
+	int dwidth	= ResolveOperand();
+	int dheight = ResolveOperand();
+	int ptr		= ResolveOperand();	
+	if (Lucent)
+		TScaleSprite8_Lucent(x, y, swidth, sheight, dwidth, dheight, (byte *) ptr);
+	else
+		TScaleSprite8(x, y, swidth, sheight, dwidth, dheight, (byte *) ptr);
+}
 
 void vc_GrabRegion()
 {
@@ -596,7 +852,7 @@ void vc_GrabRegion()
 	int ye = ResolveOperand();
 	byte *ptr = (byte *) ResolveOperand();
 
-// ensure arguments stay valid
+	// ensure arguments stay valid
 	if (x<0)
 		x=0;
 	else if (x>=myscreen->width)
@@ -615,17 +871,18 @@ void vc_GrabRegion()
 	else if (ye>=myscreen->height)
 		ye=myscreen->height-1;
 
-// swap?
 	if (xe<x) SWAP(x,xe); 
 	if (ye<y) SWAP(y,ye);
 
 	xe = xe - x + 1;
 	ye = ye - y + 1;
-		
+
+	byte* source = screen8 + (y * v2_xres) + x;
 	while (ye)
 	{
-		memset(ptr, 0, xe);
-		ptr += xe;		
+		memcpy(ptr, source, xe);
+		ptr += xe;
+		source += v2_xres;
 		ye -= 1;
 	}
 }
@@ -636,7 +893,33 @@ void vc_Log()
 	log(s.c_str());
 }
 
+void vc_fseekline()
+{
+    int line = ResolveOperand()-1;
+	VFILE *vf = (VFILE *) ResolveOperand();
+	vseek(vf, 0, SEEK_SET);
 
+	// 0 & 1 will yield first line
+	char temp[256+1];
+	do
+		vgets(temp, 256, vf);
+	while (--line > 0);
+}
+
+void vc_fseekpos()
+{
+	int pos = ResolveOperand();
+	VFILE *vf = (VFILE *) ResolveOperand();
+	vseek(vf, pos, 0);
+}
+
+void vc_fread()
+{
+	char *buffer = (char *) ResolveOperand();
+	int len = ResolveOperand();
+	VFILE *vf = (VFILE *) ResolveOperand();
+	vread(buffer, len, vf);
+}
 
 void vc_fgetbyte()
 {
@@ -728,8 +1011,21 @@ void vc_fwrite()
 	fwrite(buffer, 1, length, f);
 }
 
+void vc_frename()
+{
+	string a = ResolveString();
+	string b = ResolveString();
+	rename(a.c_str(), b.c_str());
+	log("VC renamed %s to %s.", a.c_str(), b.c_str());
+}
 
-
+void vc_fdelete()
+{
+	string filename = ResolveString();
+	EnforceNoDirectories(filename);
+	remove(filename.c_str());
+	log("VC deleted %s.", filename.c_str());
+}
 
 void vc_fwopen()
 {
@@ -750,14 +1046,103 @@ void vc_fwclose()
 	log("vc closed file (w) at handle %d", (int) f);
 }
 
+void vc_memcpy()
+{
+	char *dest = (char *) ResolveOperand();
+	char *source = (char *) ResolveOperand();
+	int length = ResolveOperand();
+	memcpy(dest, source, length);
+}
 
+void vc_memset()
+{
+	char *dest = (char *) ResolveOperand();
+	int value = ResolveOperand();
+	int length = ResolveOperand();
+	memset(dest, value, length);
+}
 
+void vc_Silhouette()
+{
+	int x = ResolveOperand();
+	int y = ResolveOperand();
+	int width = ResolveOperand();
+	int height = ResolveOperand();
+	int color = ResolveOperand();
+	int ptr = ResolveOperand();	
+	if (Lucent)
+		Silhouette8_Lucent(x, y, width, height, color, (byte *) ptr);
+	else
+		Silhouette8(x, y, width, height, color, (byte *) ptr);
+}	
+
+void vc_WriteVars()
+{
+	FILE *f = (FILE *)ResolveOperand();
+	fwrite(globalint, 1, 4*maxint, f);
+	for (int n=0; n<stralloc; n++)
+	{
+		int z = vc_strings[n].length();
+		fwrite(&z, 1, 4, f);
+		fwrite(vc_strings[n].c_str(), 1, z, f);
+		fputc(0, f);
+	}	
+}
+
+void vc_ReadVars()
+{
+	char *temp = 0;
+	FILE *f = (FILE *) ResolveOperand();
+	fread(globalint, 1, 4*maxint, f);
+
+	for (int n=0; n<stralloc; n++)
+	{
+		int z;
+		fread(&z, 1, 4, f);
+        temp = new char[z+1];
+		if (!temp)
+			err("vc_ReadVars: memory exhausted on %u bytes.", z);
+		fread(temp, 1, z, f);
+		temp[z]='\0';
+		vc_strings[n] = temp;
+        delete[] temp;
+		temp = 0;
+	}
+}
 
 void vc_Asc()
 {
 	vcreturn = ResolveString()[0];
 }
 
+void vc_Filesize()
+{
+	string filename = ResolveString();
+	VFILE *vf = vopen(filename.c_str());
+	vcreturn = filesize(vf);
+	vclose(vf);
+}
+
+void vc_FTell()
+{
+	VFILE *vf = (VFILE *) ResolveOperand();
+	vcreturn = vtell(vf);
+}
+
+void vc_ChangeCHR()
+{
+	int who = ResolveOperand();
+	string chrname = ResolveString();
+
+	if (who >= entities && vc_paranoid)
+		err("vc_ChangeCHR(): no such entity index (%d)", who);
+	if (who >= entities) return;
+
+	if (entity[who]->chr)
+		delete entity[who]->chr;
+	CHR *t = new CHR(chrname.c_str());
+	entity[who]->setchr(t);
+}
 
 
 void vc_fwritebyte()
@@ -799,8 +1184,8 @@ void HandleStdLib()
 		case 6: vc_LoadImage(); break;
 		case 7: vc_CopySprite(); break;	
 		case 8: vc_TCopySprite(); break;
-		case 9: if (current_map) current_map->Render(xwin, ywin, myscreen); break;
-		case 10: ShowPage(); break;
+		case 9: Render(); break;
+		case 10: ShowPage8(); break;
 		case 11: vc_EntitySpawn(); break;
 		case 12: vc_SetPlayer(); break;
 		case 13: vc_Map(); break;
@@ -815,7 +1200,7 @@ void HandleStdLib()
 		case 22: ProcessEntities();	break;
 		case 23: UpdateControls(); break;
 		case 24: vc_Unpress(); break;
-//		case 25: vc_EntityMove(); break;
+		case 25: vc_EntityMove(); break;
 		case 26: vc_HLine(); break;
 		case 27: vc_VLine(); break;
 		case 28: vc_Line(); break;
@@ -830,8 +1215,8 @@ void HandleStdLib()
 		case 37: vc_FontWidth(); break;
 		case 38: vc_FontHeight(); break;
 		case 39: vc_SetPixel();	break;
-//		case 40: vc_GetPixel();	break;
-//		case 41: vc_EntityOnScreen(); break;
+		case 40: vc_GetPixel();	break;
+		case 41: vc_EntityOnScreen(); break;
 		case 42: 
 			vcreturn = 0;
 			x = ResolveOperand();
@@ -839,11 +1224,11 @@ void HandleStdLib()
 			break;
 		case 43: vc_GetTile(); break;
 		case 44: vc_HookRetrace(); break;
-		/*case 45: vc_HookTimer(); break;
-		case 46: vc_SetResolution(); break;*/
+		case 45: vc_HookTimer(); break;
+		case 46: vc_SetResolution(); break;
 		case 47: vc_SetRString(); break;
 		case 48: vc_SetClipRect(); break;
-	//	case 49: vc_SetRenderDest(); break;
+		case 49: vc_SetRenderDest(); break;
 		case 50: vc_RestoreRenderSettings(); break;
 		case 51: vc_PartyMove(); break;
 		case 52:
@@ -870,19 +1255,15 @@ void HandleStdLib()
 				vcreturn = tantbl[n];
 			}
 			break;
-	    case 55: UpdateControls(); break;
+	    case 55: UpdateControls(); break; // CheckCorruption?
 		case 56: ResolveOperand(); break; // ClipOn 
 		case 57: 
 			Lucent = ResolveOperand();
-			if (!hicolor)
-			{
-				 if (Lucent) SetLucent(50);
-				 else SetLucent(0);
-			}
-			else SetLucent(Lucent);
+	        if (Lucent) SetLucent(50);
+			    else SetLucent(0);
 			break;
-/*		case 58: vc_WrapBlit(); break;
-		case 59: vc_TWrapBlit(); break;*/
+		case 58: vc_WrapBlit(); break;
+		case 59: vc_TWrapBlit(); break;
 		case 60: vc_SetMousePos(); break;
 		case 61: vc_HookKey(); break;
 		case 62: vc_PlayMusic(); break;
@@ -890,26 +1271,26 @@ void HandleStdLib()
 		case 64: vc_PaletteMorph(); break;
 		case 65: vc_OpenFile(); break;
 		case 66: vc_CloseFile(); break;
-/*		case 67: vc_QuickRead(); break;
-		case 68: vc_AddFollower(); break;
-	//case 69: vc_KillFollower(); break;
-	//case 70: vc_KillAllFollowers(); break;
-	//case 71: ResetFollowers(); */
-		case 72: err("vc_FlatPoly disabled!"); // vc_FlatPoly(); break;
-		case 73: err("vc_TMapPoly disables!"); // vc_TMapPoly(); break;
+		case 67: vc_QuickRead(); break;
+//		case 68: vc_AddFollower(); break;
+//	    case 69: vc_KillFollower(); break;
+//	    case 70: vc_KillAllFollowers(); break;
+//	    case 71: ResetFollowers();
+		case 72: err("vc_FlatPoly disabled!");
+		case 73: err("vc_TMapPoly disabled!");
 		case 74: vc_CacheSound(); break;
-			case 75: FreeAllSounds(); break;
+		case 75: FreeAllSounds(); break;
 		case 76: vc_PlaySound(); break;
-/*		case 77: vc_RotScale(); break;
-		case 78: vc_MapLine(); break;
+		case 77: vc_RotScale(); break;
+/*		case 78: vc_MapLine(); break;
 		case 79: vc_TMapLine(); break;*/
 		case 80: vc_val(); break;
-//		case 81: vc_TScaleSprite();	break;
+		case 81: vc_TScaleSprite();	break;
 		case 82: vc_GrabRegion(); break;
 		case 83: vc_Log(); break;
-		/*case 84: vc_fseekline(); break;
+		case 84: vc_fseekline(); break;
 		case 85: vc_fseekpos();	break;
-		case 86: vc_fread(); break;*/
+		case 86: vc_fread(); break;
 		case 87: vc_fgetbyte(); break;
 		case 88: vc_fgetword(); break;
 		case 89: vc_fgetquad(); break;
@@ -917,35 +1298,34 @@ void HandleStdLib()
 		case 91: vc_fgettoken(); break;
 		case 92: vc_fwritestring(); break;
 		case 93: vc_fwrite(); break;
-//		case 94: vc_frename(); break;
-//		case 95: vc_fdelete(); break;
+		case 94: vc_frename(); break;
+		case 95: vc_fdelete(); break;
 		case 96: vc_fwopen(); break;
 		case 97: vc_fwclose(); break;
-/*		case 98: vc_memcpy(); break;
+		case 98: vc_memcpy(); break;
 		case 99: vc_memset(); break;
 		case 100: vc_Silhouette(); break;
-		case 101: vcreturn=(int) InitMosaicTable();	break;	
-		case 102: vc_Mosaic(); break;
+		case 101: vcreturn = 0;	break;	
+		case 102: err("Mosaic() disabled!"); break;
 		case 103: vc_WriteVars(); break;
-		case 104: vc_ReadVars(); break;*/
+		case 104: vc_ReadVars(); break;
 		case 105: ExecuteEvent(ResolveOperand()); break;
 		case 106: vc_Asc();	break;
 		case 107: ExecuteUserFunc(ResolveOperand()); break;
-/*		case 108: vc_NumForScript(); break;
+		case 108: vcreturn=GrabD(); break; // NumForScript
 		case 109: vc_Filesize(); break;
 		case 110: vc_FTell(); break;
 		case 111: vc_ChangeCHR(); break;
-		case 112: vc_RGB(); break;
-		case 113: vc_GetR(); break;
-		case 114: vc_GetG(); break;
-		case 115: vc_GetB(); break;
-		case 116: vc_Mask(); break;
-		case 117: vc_ChangeAll(); break;*/
+		case 112: err("RGB() disabled!"); break;
+		case 113: err("GetR() disabled!"); break;
+		case 114: err("GetG() disabled!"); break;
+		case 115: err("GetB() disabled!"); break;
+		case 116: err("Mask() disabled!"); break;
+		case 117: err("ChangeAll() disabled!"); break;
         case 118: vcreturn = sqrt(ResolveOperand()); break;
         case 119: vc_fwritebyte(); break;
         case 120: vc_fwriteword(); break;
         case 121: vc_fwritequad(); break;
-//        case 122: CalcLucent(ResolveOperand()); break;
 
 		default:
 			err("VC Execution error: Invalid STDLIB index. (%d)", (int)c);

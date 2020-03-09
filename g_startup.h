@@ -1,5 +1,4 @@
 extern int v2_xres, v2_yres;
-extern bool hicolor;
 extern bool eagle;
 extern bool windowmode;
 extern bool sound;
