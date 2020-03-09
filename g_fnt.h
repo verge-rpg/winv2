@@ -1,7 +1,7 @@
 class FNT
 {
 public:
-	byte *imagedata;
+	image *rawdata, *container;
 	int width, height;
 	int subsets, selected;
 	int totalframes;
@@ -10,8 +10,9 @@ public:
 	~FNT();
 	void Render(int x, int y, int frame, image *dest);
 	void Print(int x, int y, char *str, ...);
-	int uncompress(byte* dest, int len, char *buf);
 };
+
+extern FNT *fnts[8];
 
 void Font_GotoXY(int x, int y);
 int LoadFont(char *fname);

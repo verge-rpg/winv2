@@ -995,6 +995,8 @@ void ExecuteBlock();
 
 // CODE ///////////////////////////////////////////////////////////////////////////////////////////
 
+int bindarray[256] = { 0 };
+
 static int sys_codesize=0;
 static char* absolute_sys=0;
 
@@ -1115,6 +1117,12 @@ log("%s: mapevents %d,  codesize %d", mapname, mapevents, map_codesize);
 
 void FreeMapVC()
 {
+	/* clear out map key hooks */
+	for (int i=0; i<256; i++)
+		if (bindarray[i] < USERFUNC_MARKER)
+			bindarray[i] = 0;
+
+	/* release memory */
 	delete[] event_offsets;
 	delete[] mapvc;
 	event_offsets = 0;
@@ -1181,7 +1189,7 @@ int ReadInt(char category, int loc, int ofs)
 		{
 			case 0: return xwin;
 			case 1: return ywin;
-			case 2: return 0; // cameratracking
+			case 2: return cameratracking;
 			case 3: return vctimer;
 			case 4: return up;
 			case 5: return down;
@@ -1195,13 +1203,13 @@ int ReadInt(char category, int loc, int ofs)
 			case 13: return myscreen->height;
 			case 14: return player;
 //			case 15: return cc;  ?????
-//			case 16: return tracker; ?????
+			case 16: return tracker;
 			case 17: return mouse_x;
 			case 18: return mouse_y;
 			case 19: return mouse_l | (mouse_r << 1);
 			case 20: return vctrack;
-//			case 21: image_width ???
-//			case 22: image_height ???
+			case 21: return width;
+			case 22: return depth;
 //			case 23: return 0; // volume
 			case 24: return (int) current_map->vsp->vspspace;
 //			case 25: return 0; // lastent?? 
@@ -1234,10 +1242,19 @@ int ReadInt(char category, int loc, int ofs)
 				return entity[ofs]->getx()/16;
 			case 4:
 				if (ofs<0 || ofs>=entities)
-					if (vc_paranoid) err("entity:ty no such entity, pal. (%d)", ofs);
+					if (vc_paranoid) err("entity.ty: no such entity, pal. (%d)", ofs);
 					else return 0;
 				return entity[ofs]->gety()/16;
-		
+			case 5:
+				if (ofs<0 || ofs>=entities)
+					if (vc_paranoid) err("entity.facing: no such entity, pal. (%d)", ofs);
+					else return 0;
+				return entity[ofs]->face;
+			case 6:
+				if (ofs<0 || ofs>=entities)
+					if (vc_paranoid) err("entity.moving: no such entity, pal. (%d)", ofs);
+					else return 0;
+				return !entity[ofs]->ready();
 			case 7:
 				if (ofs<0 || ofs>=entities) 
 					if (vc_paranoid) err("entity.specframe: no such entity, pal. (%d)", ofs);
@@ -1250,6 +1267,12 @@ int ReadInt(char category, int loc, int ofs)
 			case 13: return (int) (*(byte *)ofs);
 			case 14: return (int) (*(word *)ofs);
 			case 15: return (int) (*(quad *)ofs);
+			case 16:
+				{
+					int rgb[3];
+					GetColor(pal[ofs/3], &rgb[0], &rgb[1], &rgb[2]);
+					return rgb[ofs%3]*63/255;
+				}
 			case 23:
 				if (ofs<0 || ofs>=entities)
 					if (vc_paranoid) err("entity.visible: no such entity, pal. (%d)", ofs);
@@ -1257,7 +1280,7 @@ int ReadInt(char category, int loc, int ofs)
 				return entity[ofs]->visible ? 1 : 0;
 			default: err("Unknown HVAR1 (%d, %d)", loc, ofs);
 		}
-
+		break;
 	case op_LVAR:
 		if (loc<0 || loc>19)
 			err("ReadInt: bad offset to local ints: %d", loc);		
@@ -1286,7 +1309,7 @@ void WriteInt(char category, int loc, int ofs, int value)
 		{
 			case 0: xwin = value; return;
 			case 1: ywin = value; return;
-			case 2: return; // cameratracking
+			case 2: cameratracking = value; return;
 			case 3: vctimer = value; return;
 			case 20: vctrack = value; return;
 			default: err("Unknown HVAR0 (%d) (set %d)", loc, value);
@@ -1308,26 +1331,48 @@ void WriteInt(char category, int loc, int ofs, int value)
 				break;			
 			case 3: return; // entity tx
 			case 4: return; // entity ty
-
+			case 5:
+				if (ofs<0 || ofs>=entities)
+					if (vc_paranoid) err("entity.facing: no such entity, pal. (%d)", ofs);
+					else return;
+				entity[ofs]->face = value;
+				return;
+			case 6:
+				if (ofs<0 || ofs>=entities)
+					if (vc_paranoid) err("entity.moving: no such entity, pal. (%d)", ofs);
+					else return;
+				if (!value) entity[ofs]->stop();
+				return;
 			case 7:
 				if (ofs<0 || ofs>=entities) 
 					if (vc_paranoid) err("entity.specframe: no such entity, pal. (%d set: %d)", ofs, value);
 					else return;
 				entity[ofs]->specframe = value;
-				break;
+				return;
 
 			case 9: return; // entity movecode
 			case 11: keys[ofs] = value; return;
 
+			case 13: (*(byte *)ofs)=(byte) value; return;
+			case 14: (*(word *)ofs)=(word) value; return;
+			case 15: (*(quad *)ofs)=(quad) value; return;
+			case 16:
+				{
+					int rgb[3];
+					GetColor(pal[ofs/3], &rgb[0], &rgb[1], &rgb[2]);
+					rgb[ofs%3]=value*255/63;
+					pal[ofs/3] = MakeColor(rgb[0], rgb[1], rgb[2]);
+					return;
+				}
 			case 23:
 				if (ofs<0 || ofs>=entities) 
 					if (vc_paranoid) err("entity.visible: no such entity, pal. (%d set: %d)", ofs, value);
 					else return;
 				entity[ofs]->visible = value ? true : false;
-				break;
+				return;
 			default: err("Unknown HVAR1 (%d, %d) (set %d)", loc, ofs, value);
 		}
-
+		break;
 	case op_LVAR:
 		if (loc<0 || loc>19)
 			err("WriteInt: bad offset to local ints: %d", loc);
@@ -2055,7 +2100,6 @@ void HookTimer()
 void HookKey(int script)
 {
 	if (!script) return;
-
 	if (script <  USERFUNC_MARKER)
 		ExecuteEvent(script);
 	if (script >= USERFUNC_MARKER)

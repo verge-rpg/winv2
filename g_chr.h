@@ -1,7 +1,7 @@
 class CHR
 {
 public:
-	byte *imagedata;
+	image *rawdata, *container;
 
 	word fxsize, fysize;                // frame x/y dimensions
 	word hx, hy;                        // x/y obstruction hotspot

@@ -16,11 +16,18 @@ image *screen;
 /****************************************************************/
 
 int    (*MakeColor) (int r, int g, int b);
+bool   (*GetColor) (int c, int *r, int *g, int *b);
 void   (*Flip) (void);
 void   (*Blit) (int x, int y, image *src, image *dest);
 void   (*TBlit) (int x, int y, image *src, image *dest);
 void   (*Blit8) (int x, int y, char *src, int w, int h, quad pal[], image *dest);
 void   (*TBlit8) (int x, int y, char *src, int w, int h, quad pal[], image *dest);
+void   (*AdditiveBlit) (int x, int y, image *src, image *dest);
+void   (*TAdditiveBlit) (int x, int y, image *src, image *dest);
+void   (*SubtractiveBlit) (int x, int y, image *src, image *dest);
+void   (*TSubtractiveBlit) (int x, int y, image *src, image *dest);
+void   (*BlitTile) (int x, int y, char *src, image *dest);
+void   (*TBlitTile) (int x, int y, char *src, image *dest);
 void   (*Clear) (int color, image *dest);
 void   (*PutPixel) (int x, int y, int color, image *dest);
 int    (*ReadPixel) (int x, int y, image *dest);
@@ -31,9 +38,9 @@ void   (*Box) (int x, int y, int xe, int ye, int color, image *dest);
 void   (*Rect) (int x, int y, int xe, int ye, int color, image *dest);
 void   (*Sphere) (int x, int y, int xradius, int yradius, int color, image *dest);
 void   (*Circle) (int x, int y, int xradius, int yradius, int color, image *dest);
-void   (*WrapBlit) (int x, int y, image *src, image *dst);
+void   (*ScaleBlit) (int x, int y, int dw, int dh, image *src, image *dest);
 void   (*ScaleBlit8) (int x, int y, int dw, int dh, byte *src, int sw, int sh, quad pal[], image *dest);
-void   (*SetLucent) (int percent);
+void   (*WrapBlit) (int x, int y, image *src, image *dst);
 image* (*ImageFrom8bpp) (byte *src, int width, int height, byte *pal);
 image* (*ImageFrom24bpp) (byte *src, int width, int height);
 void   (*vid_Close) (void);
@@ -46,7 +53,7 @@ int vid_SetMode(int xres, int yres, int bpp, int window, int mode)
 	switch (mode)
 	{
 		case MODE_SOFTWARE:
-			if (dd_SetMode(xres, yres, bpp, window?1:0))
+			if (dd_SetMode(xres, yres, bpp, window?true:false))
 			{
 				vid_initd = true;
 				return 1;
@@ -88,7 +95,8 @@ image::image(int xres, int yres)
 
 image::~image()
 {
-	delete[] data;
+	if (data)
+		delete[] data;
 }
 
 

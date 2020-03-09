@@ -6,7 +6,7 @@ struct vspanim_r
   word mode;                         // tile-animation mode
 };
 
-extern quad pal[256];
+extern quad pal[256], base_pal[256];
 
 class VSP
 {

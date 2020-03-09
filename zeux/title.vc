@@ -1,0 +1,21 @@
+event
+{
+ UpdateControls();
+ if (key[45]) christmas=1;
+ if (key[19]) { alterpal=1; rpal=1; }
+ if (key[34]) { alterpal=1; gpal=1; }
+ if (key[48]) { alterpal=1; bpal=1; }
+ if (key[21]) { alterpal=1; rpal=1; gpal=1; }
+ if (key[46]) { alterpal=1; gpal=1; bpal=1; }
+ if (key[50]) { alterpal=1; rpal=1; bpal=1; }
+ if (key[37]) { alterpal=1; rpal=1; gpal=1; bpal=1; }
+ if (key[5])           { alterpal=1; cga=1; }
+ if (key[2] && key[7]) { alterpal=1; ega=1; }
+ if (key[12] && key[13]) { alterpal=1; greenm=1; }
+ if (key[42] && key[54]) { alterpal=1; amberm=1; }
+ if (key[34] && key[48]) { alterpal=1; gboym=1; }
+ introed=0;
+ SystemStartup();
+ IntroEffect();
+ TitleEffect();
+}

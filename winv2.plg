@@ -3,97 +3,52 @@
 <pre>
 <h1>Build Log</h1>
 <h3>
---------------------Configuration: winv2 - Win32 Release--------------------
+--------------------Configuration: winv2 - Win32 Debug--------------------
 </h3>
 <h3>Command Lines</h3>
-Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP450.tmp" with contents
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP400.tmp" with contents
 [
-/nologo /MT /W3 /GX /O2 /I "mikmod\\" /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /Fp"Release/winv2.pch" /YX /Fo"Release/" /Fd"Release/" /FD /c 
-"C:\winv2\a_common.cpp"
-"C:\winv2\a_config.cpp"
-"C:\winv2\a_image.cpp"
-"C:\winv2\a_vfile.cpp"
+/nologo /MTd /W3 /Gm /GX /ZI /Od /I "mikmod\\" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /Fp"Debug/winv2.pch" /YX /Fo"Debug/" /Fd"Debug/" /FD /GZ /c 
 "C:\winv2\g_chr.cpp"
-"C:\winv2\g_controls.cpp"
-"C:\winv2\g_engine.cpp"
-"C:\winv2\g_fnt.cpp"
-"C:\winv2\g_map.cpp"
-"C:\winv2\g_startup.cpp"
-"C:\winv2\g_vc.cpp"
-"C:\winv2\g_vsp.cpp"
-"C:\winv2\vid_ddbase.cpp"
-"C:\winv2\vid_ddblit.cpp"
-"C:\winv2\vid_manager.cpp"
-"C:\winv2\vid_sysfont.cpp"
-"C:\winv2\win_joystick.cpp"
-"C:\winv2\win_keyboard.cpp"
-"C:\winv2\win_mouse.cpp"
-"C:\winv2\win_network.cpp"
-"C:\winv2\win_system.cpp"
-"C:\winv2\win_timer.cpp"
-"C:\winv2\win_sound.cpp"
 ]
-Creating command line "cl.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP450.tmp" 
-Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP451.tmp" with contents
+Creating command line "cl.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP400.tmp" 
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP401.tmp" with contents
 [
-kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib winmm.lib dxguid.lib ddraw.lib wsock32.lib mikmod.lib mmio.lib dsound.lib /nologo /subsystem:windows /incremental:no /pdb:"Release/winv2.pdb" /machine:I386 /out:"Release/winv2.exe" 
-.\Release\a_common.obj
-.\Release\a_config.obj
-.\Release\a_image.obj
-.\Release\a_vfile.obj
-.\Release\g_chr.obj
-.\Release\g_controls.obj
-.\Release\g_engine.obj
-.\Release\g_fnt.obj
-.\Release\g_map.obj
-.\Release\g_startup.obj
-.\Release\g_vc.obj
-.\Release\g_vsp.obj
-.\Release\vid_ddbase.obj
-.\Release\vid_ddblit.obj
-.\Release\vid_manager.obj
-.\Release\vid_sysfont.obj
-.\Release\win_joystick.obj
-.\Release\win_keyboard.obj
-.\Release\win_mouse.obj
-.\Release\win_network.obj
-.\Release\win_system.obj
-.\Release\win_timer.obj
-.\Release\win_sound.obj
+kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib winmm.lib dxguid.lib ddraw.lib dinput.lib wsock32.lib mikmod.lib mmio.lib dsound.lib /nologo /subsystem:windows /incremental:yes /pdb:"Debug/winv2.pdb" /debug /machine:I386 /out:"Debug/winv2.exe" /pdbtype:sept 
+.\Debug\a_common.obj
+.\Debug\a_config.obj
+.\Debug\a_image.obj
+.\Debug\a_vfile.obj
+.\Debug\g_chr.obj
+.\Debug\g_controls.obj
+.\Debug\g_engine.obj
+.\Debug\g_fnt.obj
+.\Debug\g_map.obj
+.\Debug\g_startup.obj
+.\Debug\g_vc.obj
+.\Debug\g_vsp.obj
+.\Debug\vid_ddbase.obj
+.\Debug\vid_ddblit.obj
+.\Debug\vid_manager.obj
+.\Debug\vid_sysfont.obj
+.\Debug\win_joystick.obj
+.\Debug\win_keyboard.obj
+.\Debug\win_mouse.obj
+.\Debug\win_network.obj
+.\Debug\win_sound.obj
+.\Debug\win_system.obj
+.\Debug\win_timer.obj
 ]
-Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP451.tmp"
+Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP401.tmp"
 <h3>Output Window</h3>
 Compiling...
-a_common.cpp
-a_config.cpp
-a_image.cpp
-a_vfile.cpp
 g_chr.cpp
-g_controls.cpp
-g_engine.cpp
-g_fnt.cpp
-g_map.cpp
-g_startup.cpp
-g_vc.cpp
-g_vsp.cpp
-vid_ddbase.cpp
-vid_ddblit.cpp
-vid_manager.cpp
-vid_sysfont.cpp
-win_joystick.cpp
-win_keyboard.cpp
-win_mouse.cpp
-win_network.cpp
-win_system.cpp
-win_timer.cpp
-win_sound.cpp
 Linking...
-LINK : warning LNK4089: all references to "WSOCK32.dll" discarded by /OPT:REF
 
 
 
 <h3>Results</h3>
-winv2.exe - 0 error(s), 1 warning(s)
+winv2.exe - 0 error(s), 0 warning(s)
 </pre>
 </body>
 </html>

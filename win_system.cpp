@@ -54,7 +54,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE zwhocares, LPSTR szComman
 	srand(timeGetTime());
 	log_Init(true);
 	mouse_Init();
-	key_Init();
+	InitKeyboard();
 	joy_Init();
 	timer_Init(100);
 	InitSound();
@@ -113,12 +113,8 @@ LRESULT APIENTRY WndProc(HWND hWnd, UINT message,WPARAM wParam, LPARAM lParam)
 		break;
 
 			break;
-		case WM_KEYDOWN:
-			key_ReceiveMessage(wParam, 1);
-			return 0;
-		case WM_KEYUP:
-			key_ReceiveMessage(wParam, 0);
-			return 0;
+		case WM_KEYDOWN: return 0;
+		case WM_KEYUP: return 0;
 		case WM_LBUTTONDOWN: mouse_l = true; break; 
 		case WM_LBUTTONUP:   mouse_l = false; break;
 		case WM_RBUTTONDOWN: mouse_r = true; break;

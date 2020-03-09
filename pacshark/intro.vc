@@ -1,0 +1,7 @@
+event
+{
+ PaletteMorph(0,0,0,0,63);
+ Intro();
+ Menu();
+ Map("01.MAP");
+}

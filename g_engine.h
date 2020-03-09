@@ -55,11 +55,13 @@ public:
 extern Entity *entity[256], *myself;
 extern int entities, player;
 extern int xwin, ywin;
+extern int cameratracking, tracker;
 extern bool done;
 extern MAP *current_map;
 /******************************/
 void Engine_Start(char *map);
 void Render();
 void RenderEntities();
+void ProcessEntities();
 int AllocateEntity(int x, int y, char *chr);
 /******************************/

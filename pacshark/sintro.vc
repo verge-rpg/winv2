@@ -1,0 +1,268 @@
+int introbuf;
+
+void Intro()
+{
+ int f1,f2,f3,f4,t,f,s;
+ if (!introbuf) introbuf=LoadImage("TITLE.PCX");
+ f1=EntitySpawn(-2,6,"FISHER1.CHR");
+ f2=EntitySpawn(22,6,"FISHER2.CHR");
+ f3=EntitySpawn(-2,6,"FISHER3.CHR");
+ f4=EntitySpawn(22,6,"FISHER4.CHR");
+ t=timer;
+ while(timer<t+520)
+ {
+  entity.x[f1]=(timer-t)-40;
+  entity.specframe[f1]=4+(timer/10%4);
+  Render();
+  JigglyText((timer-t)-176,96,"Z-Men Present");
+  ShowPage();
+  UpdateControls(); if (b1) timer+=2;
+ }
+ t=timer;
+ while(timer<t+520)
+ {
+  entity.x[f2]=360-(timer-t);
+  entity.specframe[f2]=(timer/10%4);
+  Render();
+  JigglyText(400-(timer-t),96,"A 72HoV Game");
+  ShowPage();
+  UpdateControls(); if (b1) timer+=2;
+ }
+ t=timer;
+ while(timer<t+600)
+ {
+  entity.x[f3]=(timer-t)-40;
+  entity.specframe[f3]=4+(timer/10%4);
+  Render();
+   JigglyText((timer-t)-246,96,"Concept by Zaratustra");
+  ShowPage();
+  UpdateControls(); if (b1) timer+=2;
+ }
+ t=timer;
+ while(timer<t+600)
+ {
+  entity.x[f4]=360-(timer-t);
+  entity.specframe[f4]=(timer/10%4);
+  Render();
+  JigglyText(400-(timer-t),96,"Music by Zathras");
+  ShowPage();
+  UpdateControls(); if (b1) timer+=2;
+ }
+ t=timer;
+ while(timer<t+260)
+ {
+  entity.x[f1]=(timer-t)-40;
+  entity.x[f2]=(timer-t)-80;
+  entity.x[f3]=(timer-t)-120;
+  entity.x[f4]=(timer-t)-160;
+  f=4+(timer/10%4);
+  entity.specframe[f1]=f;
+  entity.specframe[f2]=f;
+  entity.specframe[f3]=f;
+  entity.specframe[f4]=f;
+  Render();
+  ShowPage();
+  UpdateControls(); if (b1) timer+=2;
+  if (timer>t+200 && s=0) { s=1;  PlaySound(sound[9],127,128); }
+ }
+ t=timer;
+ while(timer<t+50)
+ {
+  Render();
+  CopySprite(0,timer-t*2-100,320,100,introbuf);
+  CopySprite(0,200-(timer-t*2),320,100,introbuf+32000);
+  ShowPage();
+ }
+// PlaySound(sound[8],127,128);
+//  PlaySound(sound[8],127,128);
+// PlayMusic("BLANK.S3M");
+}
+
+void Menu()
+{
+ int done, o;
+ while (!done)
+  {
+   UpdateControls();
+   if (up || down || left || right)
+   {
+    o=1-o;
+    Unpress(5);Unpress(6);Unpress(7);Unpress(8);
+   }
+   if (b1 || b2 || b3 || b4)
+   {
+    done=1;
+   }
+   CopySprite(0,0,320,200,introbuf);
+   if (o) { GotoXY(124,85); PrintString(0,"New Game");
+            JigglyText(120,105,"Quit Game"); }
+     else { JigglyText(124,85,"New Game");
+            GotoXY(120,105); PrintString(0,"Quit Game"); }
+
+   GotoXY(38,188); PrintString(0,"C2001 Zaratustra and Zathras");
+   ShowPage();
+  }
+ if (o) Exit("http://zara.verge-rpg.com                                                       http://www.verge-rpg.com/~zathras");
+ FadeOut(100);
+ cameratracking=0;
+ yWin=300;
+ score=0;
+ lscore=LIVEBONUS;
+ lives=3;
+}
+
+int inte[10],intx[40],inty[40];
+void Intermission(int i)
+{
+ int t, k;
+ switch(i)
+ {
+  case 2:
+   inte[0]=EntitySpawn(-2,6,"SHARK.CHR");
+   inte[1]=EntitySpawn(-2,2,"SHARK.CHR");
+   inte[2]=EntitySpawn(-2,4,"SHARK.CHR");
+   inte[3]=EntitySpawn(-2,8,"SHARK.CHR");
+   inte[4]=EntitySpawn(-2,6,"FISHER1.CHR");
+   inte[5]=EntitySpawn(-2,2,"FISHER2.CHR");
+   inte[6]=EntitySpawn(-2,4,"FISHER3.CHR");
+   inte[7]=EntitySpawn(-2,8,"FISHER4.CHR");
+
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=(timer-t)-80;
+    entity.specframe[inte[0]]=8+(timer/10%4);
+    Render();
+    TCopySprite(entity.x[inte[0]]+40, entity.y[inte[0]], 16,16,vsp+(84+(timer/10%2)*256));
+    ShowPage();
+   }
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=360-(timer-t);
+    entity.x[inte[4]]=400-(timer-t);
+    entity.specframe[inte[0]]=16+(timer/10%4);
+    entity.specframe[inte[4]]=0+(timer/10%4);
+    Render();
+    ShowPage();
+   }
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=(timer-t)-80;
+    entity.x[inte[1]]=(timer-t)-80;
+    entity.x[inte[2]]=(timer-t)-80;
+    entity.x[inte[3]]=(timer-t)-80;
+    entity.x[inte[4]]=(timer-t)-40;
+    entity.specframe[inte[0]]=8+(timer/10%4);
+    entity.specframe[inte[1]]=8+(timer/10%4);
+    entity.specframe[inte[2]]=8+(timer/10%4);
+    entity.specframe[inte[3]]=8+(timer/10%4);
+    entity.specframe[inte[4]]=4+(timer/10%4);
+    Render();
+    ShowPage();
+   }
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=360-(timer-t);
+    entity.x[inte[1]]=360-(timer-t);
+    entity.x[inte[2]]=360-(timer-t);
+    entity.x[inte[3]]=360-(timer-t);
+    entity.x[inte[4]]=400-(timer-t);
+    entity.x[inte[5]]=400-(timer-t);
+    entity.x[inte[6]]=400-(timer-t);
+    entity.x[inte[7]]=400-(timer-t);
+    entity.specframe[inte[0]]=16+(timer/10%4);
+    entity.specframe[inte[1]]=16+(timer/10%4);
+    entity.specframe[inte[2]]=16+(timer/10%4);
+    entity.specframe[inte[3]]=16+(timer/10%4);
+    entity.specframe[inte[4]]=0+(timer/10%4);
+    entity.specframe[inte[5]]=0+(timer/10%4);
+    entity.specframe[inte[6]]=0+(timer/10%4);
+    entity.specframe[inte[7]]=0+(timer/10%4);
+    Render();
+    ShowPage();
+   }
+
+  case 3:
+   inte[0]=EntitySpawn(-2,6,"SHARK.CHR");
+   inte[1]=EntitySpawn(-2,6,"SWIMMER.CHR");
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=(timer-t)-80;
+    entity.x[inte[1]]=(timer-t)-40;
+    entity.specframe[inte[0]]=8+(timer/10%4);
+    entity.specframe[inte[1]]=0+(timer/10%4);
+    Render();
+    ShowPage();
+   }
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=360-(timer-t);
+    entity.x[inte[1]]=400-(timer-t);
+    entity.specframe[inte[0]]=28+(timer/10%4);
+    entity.specframe[inte[1]]=4+(timer/10%4);
+    Render();
+    ShowPage();
+   }
+   
+  case 4:
+   for (k=0; k<40; k++)
+    {
+     intx[k]=random(100);inty[k]=random(100);
+    }
+   inte[0]=EntitySpawn(-2,6,"SHARK.CHR");
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=(timer-t)-80;
+    entity.specframe[inte[0]]=8+(timer/10%4);
+    Render();
+    TCopySprite(entity.x[inte[0]]+40, entity.y[inte[0]], 16,16,vsp+(84+(timer/10%2)*256));
+    ShowPage();
+   }
+   t=timer;
+   while (timer<t+540)
+   {
+    entity.x[inte[0]]=360-(timer-t);
+    entity.specframe[inte[0]]=16+(timer/10%4);
+    Render();
+    for (k=0; k<40; k++)
+     {
+      TCopySprite(entity.x[inte[0]]+40+intx[k], entity.y[inte[0]]-50+inty[k], 16,16,vsp+(88+(timer/10%2)*256));
+     }
+
+    ShowPage();
+   }
+
+  case 1:
+   inte[0]=EntitySpawn(-2,6,"FISHER1.CHR");
+   inte[1]=EntitySpawn(-2,6,"SHARK.CHR");
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=(timer-t)-80;
+    entity.x[inte[1]]=(timer-t)-40;
+    entity.specframe[inte[0]]=4+(timer/10%4);
+    entity.specframe[inte[1]]=8+(timer/10%4);
+    Render();
+    ShowPage();
+   }
+   t=timer;
+   while (timer<t+440)
+   {
+    entity.x[inte[0]]=360-(timer-t);
+    entity.x[inte[1]]=400-(timer-t);
+    entity.specframe[inte[0]]=32+(timer/10%4);
+    entity.specframe[inte[1]]=32+(timer/10%4);
+    Render();
+    ShowPage();
+   }
+   
+ }
+ playSound(sound[5],127,128);
+}
+

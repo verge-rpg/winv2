@@ -1,0 +1,92 @@
+
+#define WAVESTEP 4
+
+int font1,f1x,f1y;
+int va,vb,vc,vd,ve,vf,vg,vh,vi;
+int scrbuf;
+int sound[20];
+int stage;
+
+void Autoexec()
+{
+ f1x=fontwidth(0);
+ f1y=fontheight(0);
+ sound[0]=CacheSound("sting.wav");
+ sound[1]=CacheSound("sting2.wav");
+ sound[4]=CacheSound("eat.wav");
+ sound[5]=CacheSound("applause.wav");
+ sound[6]=CacheSound("sonar.wav");
+ sound[7]=CacheSound("ohmygod.wav");
+ sound[8]=CacheSound("squish.wav");
+ sound[9]=CacheSound("ohsquish.wav");
+ sound[10]=CacheSound("squish1.wav");
+ sound[11]=CacheSound("squish2.wav");
+ map("intro.map");
+ lives=3;
+// map("01.map");
+// map("04.map");
+// map("inter.map");
+}
+// 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+// 0 1 2 3 4 5 6 7 7 6  5  4  3  2  1  0
+
+void GlowText(int x, int y, string text, int c1)
+{
+ int c;
+ c=timer/5%16; if (c>7) c=15-c; c=c1*16+6+c;
+ RectFill(x  ,y  ,x+(f1x*strlen(text))+1,y+f1y+1,1);
+ RectFill(x+1,y+1,x+(f1x*strlen(text)),y+f1y,c);
+ GotoXY(x+1,y+1); PrintString(font1, text);
+}
+
+
+void Wavey()
+{
+ int y;
+ if (!scrbuf)
+ { scrbuf=malloc(320*200);
+   GrabRegion(0,0,319,199,scrbuf); }
+ for (y=0; y<200; y+=WAVESTEP)
+ {
+  CopySprite(sin(timer+y*4%360)>>13,y,320,WAVESTEP,scrbuf+(y*320));
+ }
+}
+
+void JigglyText(int x, int y, string t)
+{
+ int i;
+ for (i=0; i<strlen(t); i++)
+  {
+   GotoXY(x+(f1x*i),y+(sin(timer+(i*5)*5%360)>>15));
+   PrintString(0,mid(t,i,1));
+  }
+}
+
+void FadeOut(int t)
+{
+ int t2;
+ t2=timer;
+ while(timer<t2+t)
+ {
+  PaletteMorph(0,0,0,(timer-t2)*100/t,63);
+  ShowPage();
+ }
+ PaletteMorph(0,0,0,100,63);
+ ShowPage();
+}
+
+void FadeIn(int t)
+{
+ int t2;
+ t2=timer;
+ while(timer<t2+t)
+ {
+  PaletteMorph(0,0,0,100-((timer-t2)*100/t),63);
+  ShowPage();
+ }
+ PaletteMorph(0,0,0,0,63);
+ ShowPage();
+}
+
+#include "shark.vc"
+#include "sintro.vc"

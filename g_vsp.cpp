@@ -10,11 +10,13 @@
 #define  VSP_8BPP_BYTECOMPRESSED 3
 
 quad pal[256];
+quad base_pal[256];
 
 VSP::VSP(char *fname)
 {
 	numtiles = 0;
 	LoadVSP(fname);
+	memcpy(base_pal, pal, sizeof pal);
 	mytimer = systemtime;
 }
 

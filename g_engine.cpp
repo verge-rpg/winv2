@@ -9,10 +9,12 @@
 
 Entity *entity[256];
 int entities=0, player;
+int cameratracking=1, tracker=0;
 MAP *current_map;
 Entity *myself;
 int xwin, ywin;
 bool done;
+
 /****************************** code ******************************/
 
 Entity::Entity()
@@ -232,11 +234,11 @@ void Entity::set_wander(int x1, int y1, int x2, int y2, int step, int delay)
 
 void Entity::do_movescript()
 {
-/*	int arg;
+	int arg;
 
 	while ((movestr[moveofs] >= '0' && movestr[moveofs] <= '9') || movestr[moveofs] == ' ')
 		moveofs++;
-	switch(vtoupper(movestr[moveofs]))
+	switch(toupper(movestr[moveofs]))
 	{
 		case 'L': moveofs++;
 				  arg = atoi(&movestr[moveofs]);
@@ -277,7 +279,7 @@ void Entity::do_movescript()
 				  break;
 		case 0:   moveofs = 0; movecode = 0; framect = 0; return;
 		default: err("Entity::do_movescript(), unidentify movescript command");
-	} */
+	} 
 }
 
 void Entity::do_wander()
@@ -407,6 +409,45 @@ void ProcessControls()
 	}
 }
 
+void Render()
+{
+	switch (cameratracking)
+	{
+		case 0: 
+			break;
+		case 1:	
+			if (myself)
+			{
+				xwin = (myself->getx() + 8) - (myscreen->width / 2);
+				ywin = (myself->gety() + 8) - (myscreen->height / 2);
+			}
+			else xwin=0, ywin=0;
+			if (xwin < 0) xwin = 0;
+			if (ywin < 0) ywin = 0;
+/*				if (xwin + myscreen->width > rmap)
+				xwin = rmap - myscreen->width;
+			if (ywin + myscreen->height > dmap)
+				ywin = dmap - myscreen->height;*/
+			break;
+		case 2:
+			if (tracker>=entities)
+			{
+				xwin = 0;
+				ywin = 0;
+			}
+			else
+			{
+				xwin = (entity[tracker]->getx() + 8) - (myscreen->width/2);
+				ywin = (entity[tracker]->gety() + 8) - (myscreen->height/2);
+			}
+			if (xwin < 0) xwin = 0;
+			if (ywin < 0) ywin = 0;
+			//fixme lower/right map bounds!
+			break;
+	}	
+	current_map->Render(xwin, ywin, myscreen);
+}
+
 void Engine_Start(char *mapname)
 {
 	bool checkzone;
@@ -441,24 +482,7 @@ void Engine_Start(char *mapname)
 			checkzone = false;
 			timer--;
 		}
-
-		if (myself)
-		{
-			xwin = (myself->getx() + 8) - (myscreen->width / 2);
-			ywin = (myself->gety() + 8) - (myscreen->height / 2);
-		}
-		else xwin=0, ywin=0;
-		if (xwin < 0) xwin = 0;
-		if (ywin < 0) ywin = 0;
-/*		if (xwin + myscreen->width > rmap)
-			xwin = rmap - myscreen->width;
-		if (ywin + myscreen->height > dmap)
-			ywin = dmap - myscreen->height;*/
-		
-		current_map->Render(xwin, ywin, myscreen);
-
-		Font_GotoXY(75, 75);
-		PrintText(0, "I like chinese!");
+		Render();
 		ShowPage();
 		Sleep(1);
 	}

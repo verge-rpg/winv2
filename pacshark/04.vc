@@ -1,0 +1,19 @@
+event
+{
+ MakeWall(1);
+ MakeFish(2);
+ HookRetrace(1);
+ playerx=10; playery=15;
+ fisherx=10; fishery=12;
+ SharkLoop();
+ FadeOut(100);
+ stage=1;
+ if (game=1) map("inter.map");
+ else map("intro.map");
+}
+
+event
+{
+ Wavey();
+ FishRender();
+}

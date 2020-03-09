@@ -27,7 +27,7 @@ void InitDefaults()
 	v2_xres = 320;
 	v2_yres = 200;
 	hicolor = false;
-	eagle = true;
+	eagle = false;
 	windowmode = true;
 	sound = true;
 }
@@ -111,9 +111,9 @@ void xmain(int argc, char *argv[])
 	InitVideo();
 //	if (sound) InitSound();
 			
+	LoadFont("system.fnt");
 	LoadSystemVC();
 	RunVCAutoexec();
-	LoadFont("system.fnt");
 
 	while (true)
 		Engine_Start(mapname);

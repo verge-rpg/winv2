@@ -7,6 +7,8 @@
 
 /***************************** data *****************************/
 
+int alpha=0, ialpha=100;
+int tmask;
 
 /***************************** code *****************************/
 
@@ -629,12 +631,198 @@ int dd15_MakeColor(int r, int g, int b)
 	return (((r>>3)<<10)|((g>>3)<<5)|(b>>3));
 }
 
+
+bool dd15_GetColor(int c, int *r, int *g, int *b)
+{
+	if (c == transColor) return false;
+	*b = (c & 0x1F) << 3;
+	*g = ((c >> 5) & 0x1f) << 3;
+	*r = ((c >> 10) & 0x1f) << 3;
+    return true;
+}
+
+
+void dd15_PutPixel_lucent(int x, int y, int color, image *dest)
+{
+	word *s = (word *) dest -> data + (y * dest -> pitch) + x;
+	word r1, g1, b1;
+	word r2, g2, b2;
+	word d;
+
+	if (x<dest->cx1 || y<dest->cy1 || x>dest->cx2 || y>dest->cy2)
+		return;
+
+	r1 = (*s & 0x7C00) >> 10,
+	g1 = (*s & 0x03E0) >> 5,
+	b1 = (*s & 0x001F);
+
+	r2 = (color & 0x7C00) >> 10,
+	g2 = (color & 0x03E0) >> 5,
+	b2 = (color & 0x001F);
+
+	d =
+		((((r1 * alpha) + (r2 * ialpha)) / 100) << 10) |
+		((((g1 * alpha) + (g2 * ialpha)) / 100) << 5) |
+		((((b1 * alpha) + (b2 * ialpha)) / 100));
+
+	*s = d;
+}
+
+
+void dd15_ScaleBlit_lucent(int x, int y, int dw, int dh, image *src, image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	word *d, *s, c;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2
+	|| x + xl < cx1 || y + yl < cy1)
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (src->width << 16)/dw;
+	yadj = (src->height << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (word *) src->data;
+	s += ((yerr_start >> 16) * src->pitch);
+	d = ((word *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			word r1, g1, b1;
+			word r2, g2, b2;
+			word dp;
+
+			c = s[xerr>>16];
+			dp = d[j];
+				
+			r1 = (c & 0x7C00) >> 10,
+			g1 = (c & 0x03E0) >> 5,
+			b1 = (c & 0x001F);
+
+			r2 = (dp & 0x7C00) >> 10,
+			g2 = (dp & 0x03E0) >> 5,
+			b2 = (dp & 0x001F);
+
+			dp = ((((r1 * ialpha) + (r2 * alpha)) / 100) << 10) |
+			     ((((g1 * ialpha) + (g2 * alpha)) / 100) << 5) |
+		         ((((b1 * ialpha) + (b2 * alpha)) / 100));
+
+			d[j] = dp;
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
+	}
+}
+
+
+void dd15_WrapBlit_lucent(int x, int y, image *src, image *dst)
+{
+	int i;
+	int cliph, clipw;
+	int curx, cury;
+	int spanx, spany;
+	word *source, *dest;
+	int sc;
+
+	cliph = dst->cy2 - dst->cy1 + 1;
+	clipw = dst->cx2 - dst->cx1 + 1;
+	y %= src->height;
+	curx = 0;
+
+	do
+	{
+		x %= curx ? 1 : src->width;
+		spanx = src->width - x;
+		if (curx + spanx >= clipw)
+			spanx = clipw - curx;
+		source = (word *) src -> data + (y * src->width) + x;
+		dest = (word *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
+		cury = 0;
+
+		do
+		{
+			spany = src->height - (cury ? 0 : y);
+			if (cury + spany >= cliph)
+				spany = cliph - cury;
+
+			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
+			{
+				for (int x = 0; x < spanx; x++)
+				{
+					word r1, g1, b1;
+					word r2, g2, b2;
+					word d;
+
+					sc=source[x];
+					d=dest[x];
+				
+					r1 = (sc & 0x7C00) >> 10,
+					g1 = (sc & 0x03E0) >> 5,
+					b1 = (sc & 0x001F);
+
+					r2 = (d & 0x7C00) >> 10,
+					g2 = (d & 0x03E0) >> 5,
+					b2 = (d & 0x001F);
+
+					d = ((((r1 * alpha) + (r2 * ialpha)) / 100) << 10) |
+						((((g1 * alpha) + (g2 * ialpha)) / 100) << 5) |
+						((((b1 * alpha) + (b2 * ialpha)) / 100));
+
+					dest[x] = d;
+				}
+			}
+
+			source = (word *) src->data + x;
+			cury += spany;
+		} while (cury < cliph);
+		curx +=	spanx;
+	} while (curx < clipw);
+}  
+
+
 /********************** 16bpp blitter code **********************/
 
 
 int dd16_MakeColor(int r, int g, int b)
 {
 	return (((r>>3)<<11)|((g>>2)<<5)|(b>>3));
+}
+
+
+bool dd16_GetColor(int c, int *r, int *g, int *b)
+{
+	if (c == transColor) return false;
+	*b = (c & 0x1F) << 3;
+	*g = ((c >> 5) & 0x3f) << 2;
+	*r = ((c >> 11) & 0x1f) << 3;
+    return true;
 }
 
 
@@ -647,12 +835,60 @@ void dd16_Clear(int color, image *dest)
 }
 
 
+int dd16_ReadPixel(int x, int y, image *source)
+{
+	word *ptr = (word*)source->data;
+	return ptr[(y * source->pitch) + x];
+}
+
+
 void dd16_PutPixel(int x, int y, int color, image *dest)
 {
 	word *ptr = (word *)dest->data;
 	if (x<dest->cx1 || x>dest->cx2 || y<dest->cy1 || y>dest->cy2)
 		return;
 	ptr[(y * dest->pitch) + x] = color;
+}
+
+
+void dd16_PutPixel_50lucent(int x, int y, int color, image *dest)
+{
+	quad s, c; 
+	word *d = (word *) dest->data;
+	
+	if (x<dest->cx1 || y<dest->cy1 || x>dest->cx2 || y>dest->cy2)
+		return;
+
+	s=d[(y * dest->pitch) + x];
+	c=(s & tmask) + (color & tmask);
+	d[(y * dest->pitch) + x] = (word) (c >> 1);
+}
+
+
+void dd16_PutPixel_lucent(int x, int y, int color, image *dest)
+{
+	word *s = (word *) dest -> data + (y * dest -> pitch) + x;
+	word r1, g1, b1;
+	word r2, g2, b2;
+	word d;
+
+	if (x<dest->cx1 || y<dest->cy1 || x>dest->cx2 || y>dest->cy2)
+		return;
+
+	r1 = (*s & 0xF800) >> 11,
+	g1 = (*s & 0x07E0) >> 5,
+	b1 = (*s & 0x001F);
+
+	r2 = (color & 0xF800) >> 11,
+	g2 = (color & 0x07E0) >> 5,
+	b2 = (color & 0x001F);
+
+	d =
+		((((r1 * alpha) + (r2 * ialpha)) / 100) << 11) |
+		((((g1 * alpha) + (g2 * ialpha)) / 100) << 5) |
+		((((b1 * alpha) + (b2 * ialpha)) / 100));
+
+	*s = d;
 }
 
 
@@ -673,6 +909,47 @@ void dd16_HLine(int x, int y, int xe, int color, image *dest)
 }
 
 
+void dd16_HLine_50lucent(int x, int y, int xe, int color, image *dest)
+{
+	word *d = (word *)dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	int s;
+	if (xe<x) SWAP(x,xe);
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || xe<cx1 || y<cy1)
+		return;
+
+	if (xe>cx2) xe=cx2;
+	if (x<cx1)  x =cx1;
+
+	d+=(y*dest->pitch)+x;
+	for (; x<=xe; x++)
+	{
+		s=*d;
+		s=(s & tmask) + (color & tmask);
+		*d++ = (word) (s >> 1);
+	}
+}
+
+
+void dd16_HLine_lucent(int x, int y, int xe, int color, image *dest)
+{
+	word *d = (word *)dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	if (xe<x) SWAP(x,xe);
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || xe<cx1 || y<cy1)
+		return;
+
+	if (xe>cx2) xe=cx2;
+	if (x<cx1)  x =cx1;
+
+	d+=(y*dest->pitch)+x;
+	for (; x<=xe; x++)
+		PutPixel(x, y, color, dest);
+}
+
+
 void dd16_VLine(int x, int y, int ye, int color, image *dest)
 {
 	word *d = (word *) dest->data;
@@ -687,6 +964,810 @@ void dd16_VLine(int x, int y, int ye, int color, image *dest)
 	d += (y * dest->pitch) + x;
 	for (; y<=ye; y++, d+=dest->pitch)
 		*d = color;		
+}
+
+
+void dd16_VLine_50lucent(int x, int y, int ye, int color, image *dest)
+{
+	word *d = (word *) dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	if (ye<y) SWAP(y,ye);
+	int s;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x<cx1 || ye<cy1)
+		return;
+	if (ye>cy2) ye=cy2;
+	if (y<cy1)  y =cy1;
+
+	d += (y * dest->pitch) + x;
+	for (; y<=ye; y++, d+=dest->pitch)
+	{
+		s=*d;
+		s=(s & tmask) + (color & tmask);
+		*d++ = (word) (s >> 1);
+	}
+}
+
+
+void dd16_VLine_lucent(int x, int y, int ye, int color, image *dest)
+{
+	word *d = (word *)dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	if (ye<y) SWAP(y,ye);
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x<cx1 || ye<cy1)
+		return;
+
+	if (ye>cy2) ye=cy2;
+	if (y<cy1)  y =cy1;
+
+	d+=(y*dest->pitch)+x;
+	for (; y<=ye; y++)
+		PutPixel(x, y, color, dest);
+}
+
+void dd16_AddBlit(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp5[2];
+	int dp6[2];
+	int yi;
+
+	dp5[1]=0x1F;
+	dp6[1]=0x3F;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+/*		for(xi=0;xi<xlen;xi++)
+		{
+			dp5[0]=((d[xi]&0x1F)+(s[xi]&0x1F));
+			b=dp5[dp5[0]>>5];
+			dp6[0]=((d[xi]&0x07E0)+(s[xi]&0x07E0))>>5;
+			g=dp6[dp6[0]>>6];
+			dp5[0]=((d[xi]&0xF800)>>11)+((s[xi]&0xF800)>>11);
+			r=dp5[dp5[0]>>5];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}*/
+		__asm
+		{
+			mov esi,s;
+			mov edi,d;
+			mov ecx,xlen;
+
+			push ebp;
+
+			dd16lab0:
+			lodsw;
+			mov dx,[edi];
+			mov bx,ax;
+			mov bp,dx;
+			ror ebx,16;
+			mov bx,ax;
+			ror eax,16;
+			
+			
+			//eax src,???
+			//ebx src,src
+			//dx  dest
+			//bp  dest
+
+			//b
+			xor al,al;
+			and bx,0x001F;
+			and dx,0x001F;
+			shl bx,3;
+			shl dx,3;
+			add dl,bl;
+			adc al,0;
+			neg al;
+			//at this point ah is either 00000000 or 11111111
+			or al,dl;
+			//go ahead and put BBBBB in the bottom bits
+			shr al,3;
+			
+			//g
+			xor ah,ah;
+			ror ebx,16;
+			mov dx,bp;
+			and bx,0x07E0;
+			and dx,0x07E0;
+			shl bx,5;
+			shl dx,5;
+			add dh,bh;
+			adc ah,0;
+			shl ah,2;
+			neg ah;
+			//at this point ah is either 00000000 or 11111100
+			or dh,ah;
+
+			//go ahead and put 00000GGGGGGBBBBB in ax
+			shr dx,5;
+			xor ah,ah;
+			or ax,dx;
+
+			//r
+			//the 00000GGGGGGBBBBB word will now be in the top word of eax
+			ror eax,16;
+			mov bx,ax;
+			xor ah,ah;
+			mov dx,bp;
+			and bx,0xF800;
+			and dx,0xF800;
+			add dh,bh;
+			adc ah,0;
+			shl ah,3;
+			neg ah;
+			//at this point ah is either 00000000 or 11111000
+			or dh,ah;
+			//now DH only has RRRRR00000000000
+
+
+			//build new rgb value
+			//rotate the 00000GGGGGGBBBBB word back into AX
+			ror eax,16;
+			//OR it with dh=RRRRR00000000000
+			or ah,dh;
+
+			//store new rgb value
+			stosw;
+
+			//next x;
+			dec ecx;
+			jnz  dd16lab0;
+			//loop dd16lab0;
+
+			pop ebp;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_AddBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp5[2];
+	int dp6[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp5[1]=0x1F;
+	dp6[1]=0x3F;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp5[0]=((d[xi]&0x1F)+((s[xi]&0x1F)/2));
+			b=dp5[dp5[0]>>5];
+			dp6[0]=((d[xi]&0x07E0)+((s[xi]&0x07E0)/2))>>5;
+			g=dp6[dp6[0]>>6];
+			dp5[0]=((d[xi]&0xF800)>>11)+(((s[xi]&0xF800)>>11)/2);
+			r=dp5[dp5[0]>>5];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_AddBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp5[2];
+	int dp6[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp5[1]=0x1F;
+	dp6[1]=0x3F;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp5[0]=((d[xi]&0x1F)+(((int)(s[xi]&0x1F)*ialpha)/100));
+			b=dp5[dp5[0]>>5];
+			dp6[0]=((d[xi]&0x07E0)+(((int)(s[xi]&0x07E0)*ialpha)/100))>>5;
+			g=dp6[dp6[0]>>6];
+			dp5[0]=((d[xi]&0xF800)>>11)+(((int)((s[xi]&0xF800)*ialpha)/100)>>11);
+			r=dp5[dp5[0]>>5];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_TAddBlit(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp5[2];
+	int dp6[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp5[1]=0x1F;
+	dp6[1]=0x3F;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp5[0]=((d[xi]&0x1F)+(s[xi]&0x1F));
+			b=dp5[dp5[0]>>5];
+			dp6[0]=((d[xi]&0x07E0)+(s[xi]&0x07E0))>>5;
+			g=dp6[dp6[0]>>6];
+			dp5[0]=((d[xi]&0xF800)>>11)+((s[xi]&0xF800)>>11);
+			r=dp5[dp5[0]>>5];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;	
+	}		
+}
+
+
+void dd16_TAddBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp5[2];
+	int dp6[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp5[1]=0x1F;
+	dp6[1]=0x3F;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp5[0]=((d[xi]&0x1F)+((s[xi]&0x1F)/2));
+			b=dp5[dp5[0]>>5];
+			dp6[0]=((d[xi]&0x07E0)+((s[xi]&0x07E0)/2))>>5;
+			g=dp6[dp6[0]>>6];
+			dp5[0]=((d[xi]&0xF800)>>11)+(((s[xi]&0xF800)>>11)/2);
+			r=dp5[dp5[0]>>5];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_TAddBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp5[2];
+	int dp6[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp5[1]=0x1F;
+	dp6[1]=0x3F;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp5[0]=((d[xi]&0x1F)+(((int)(s[xi]&0x1F)*ialpha)/100));
+			b=dp5[dp5[0]>>5];
+			dp6[0]=((d[xi]&0x07E0)+(((int)(s[xi]&0x07E0)*ialpha)/100))>>5;
+			g=dp6[dp6[0]>>6];
+			dp5[0]=((d[xi]&0xF800)>>11)+(((int)((s[xi]&0xF800)*ialpha)/100)>>11);
+			r=dp5[dp5[0]>>5];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_SubtractBlit(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp[1]=0;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp[0]=((d[xi]&0x1F)-(s[xi]&0x1F));
+			b=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0x07E0)-(s[xi]&0x07E0))>>5;
+			g=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0xF800)-(s[xi]&0xF800))>>11;
+			r=dp[(dp[0]>>31)&1];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_SubtractBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp[1]=0;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp[0]=((d[xi]&0x1F)-(s[xi]&0x1F)/2);
+			b=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0x07E0)-(s[xi]&0x07E0)/2)>>5;
+			g=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0xF800)-(s[xi]&0xF800)/2)>>11;
+			r=dp[(dp[0]>>31)&1];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_SubtractBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp[1]=0;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp[0]=((d[xi]&0x1F)-((int)(s[xi]&0x1F)*ialpha)/100);
+			b=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0x07E0)-((int)(s[xi]&0x07E0)*ialpha)/100)>>5;
+			g=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0xF800)-((int)(s[xi]&0xF800)*ialpha)/100)>>11;
+			r=dp[(dp[0]>>31)&1];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_TSubtractBlit(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp[1]=0;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp[0]=((d[xi]&0x1F)-(s[xi]&0x1F));
+			b=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0x07E0)-(s[xi]&0x07E0))>>5;
+			g=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0xF800)-(s[xi]&0xF800))>>11;
+			r=dp[(dp[0]>>31)&1];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_TSubtractBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp[1]=0;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp[0]=((d[xi]&0x1F)-(s[xi]&0x1F)/2);
+			b=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0x07E0)-(s[xi]&0x07E0)/2)>>5;
+			g=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0xF800)-(s[xi]&0xF800)/2)>>11;
+			r=dp[(dp[0]>>31)&1];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd16_TSubtractBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+	
+	d += (y * dpitch) + x;
+
+	int dp[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp[1]=0;
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if(s[xi]==transColor)continue;
+			dp[0]=((d[xi]&0x1F)-((int)(s[xi]&0x1F)*ialpha)/100);
+			b=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0x07E0)-((int)(s[xi]&0x07E0)*ialpha)/100)>>5;
+			g=dp[(dp[0]>>31)&1];
+			dp[0]=((d[xi]&0xF800)-((int)(s[xi]&0xF800)*ialpha)/100)>>11;
+			r=dp[(dp[0]>>31)&1];
+			d[xi]=(r<<11)|(g<<5)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
 }
 
 
@@ -721,6 +1802,63 @@ void dd16_Blit(int x, int y, image *src, image *dest)
 	d += (y * dpitch) + x;
 	for (xlen *= 2; ylen--; s+=spitch, d+=dpitch)
 		memcpy(d, s, xlen);
+}
+
+
+void dd16_Blit_50lucent(int x, int y, image *src, image *dest)
+{	
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	int sc;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}	
+	d+=y*dpitch+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			sc=s[x];
+	        sc=(sc & tmask) + (d[x] & tmask);
+			d[x] = (word) (sc >> 1);			
+		}
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd16_Blit_lucent(int x, int y, image *src, image *dest)
+{
+	word *s=(word *)src->data;
+	int h=src->height, w=src->width;
+	int j;
+
+	for (; h--; y++,x-=w)
+	{
+		for (j=w; j--; x++)
+			PutPixel(x, y, *s++, dest);
+	}
 }
 
 
@@ -765,6 +1903,64 @@ void dd16_TBlit(int x, int y, image *src, image *dest)
 }
 
 
+void dd16_TBlit_50lucent(int x, int y, image *src, image *dest)
+{	
+	word *s=(word *)src->data,
+		 *d=(word *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	int sc;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}	
+	d+=y*dpitch+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			sc=s[x]; if (sc == transColor) continue;
+	        sc=(sc & tmask) + (d[x] & tmask);
+			d[x] = (word) (sc >> 1);			
+		}
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd16_TBlit_lucent(int x, int y, image *src, image *dest)
+{
+	word *s=(word *) src->data;
+	int h=src->height, w=src->width;
+	int j;
+
+	for (; h--; y++,x-=w)
+	{
+		for (j=w; j--; x++)
+			if (*s != transColor) PutPixel(x, y, *s++, dest);
+			else s++;
+	}
+}
+
+
 void dd16_Blit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
 {
 	byte *s = (byte *) src;
@@ -798,6 +1994,50 @@ void dd16_Blit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
 	{
 		for (x=0; x<xlen; x++)			
 			d[x]=pal[s[x]];
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd16_Blit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], image *dest)
+{
+	byte *s = (byte *) src;
+	word *d = (word *) dest->data;
+	int spitch=w,
+		dpitch=dest->pitch;
+	int xlen=w,
+		ylen=h;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	word sc;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d+=(y*dest->pitch)+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			sc=pal[s[x]];
+	        sc=(sc & tmask) + (d[x] & tmask);
+			d[x] = (word) (sc >> 1);			
+		}	
 		s+=spitch;
 		d+=dpitch;
 	}
@@ -847,44 +2087,309 @@ void dd16_TBlit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
 }
 
 
-void dd16_WrapBlit(int x, int y, image *src, image *dst)
+void dd16_TBlit8_50lucent(int x, int y, char *src, int w, int h, quad pal[], image *dest)
 {
-	int i;
-	int cliph, clipw;
-	int curx, cury;
-	int spanx, spany;
-	word *source, *dest;
+	byte *s = (byte *) src;
+	word *d = (word *) dest->data;
+	int spitch=w,
+		dpitch=dest->pitch;
+	int xlen=w,
+		ylen=h;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	word sc;
 
-	cliph = dst->cy2 - dst->cy1 + 1;
-	clipw = dst->cx2 - dst->cx1 + 1;
-	y %= src->height;
-	curx = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
 
-	do
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d+=(y*dest->pitch)+x;
+	for (; ylen; ylen--)
 	{
-		x %= curx ? 1 : src->width;
-		spanx = src->width - x;
-		if (curx + spanx >= clipw)
-			spanx = clipw - curx;
-		source = (word *) src -> data + (y * src->width) + x;
-		dest = (word *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
-		cury = 0;
-
-		do
+		for (x=0; x<xlen; x++)
 		{
-			spany = src->height - (cury ? 0 : y);
-			if (cury + spany >= cliph)
-				spany = cliph - cury;
+			if (!s[x]) continue;
+			sc=pal[s[x]];
+	        sc=(sc & tmask) + (d[x] & tmask);
+			d[x] = (word) (sc >> 1);			
+		}	
+		s+=spitch;
+		d+=dpitch;
+	}
+}
 
-			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
-				memcpy(dest, source, spanx*2);
 
-			source = (word *) src->data + x;
-			cury += spany;
-		} while (cury < cliph);
-		curx +=	spanx;
-	} while (curx < clipw);
-}  
+void dd16_BlitTile(int x, int y, char *src, image *dest)
+{
+	word *s=(word *) src,
+		 *d=(word *) dest->data;
+	int spitch=16,
+		dpitch=dest->pitch;
+	int xlen=16,
+		ylen=16;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d+=(y*dest->pitch)+x;
+	for (xlen*=2; ylen--; s+=spitch,d+=dpitch)
+    	memcpy(d, s, xlen);
+}
+
+
+void dd16_TBlitTile(int x, int y, char *src, image *dest)
+{
+	word *s=(word *) src,
+		 *d=(word *) dest->data;
+	int spitch=16,
+		dpitch=dest->pitch;
+	int xlen=16,
+		ylen=16;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	word c;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x = cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y=cy1;
+	}
+	d+=y*dpitch+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			c=s[x];
+			if (c != transColor) d[x]=c;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd16_ScaleBlit(int x, int y, int dw, int dh, image *src, image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	word *d, *s;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2
+	|| x + xl < cx1 || y + yl < cy1)
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (src->width << 16)/dw;
+	yadj = (src->height << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (word *) src->data;
+	s += ((yerr_start >> 16) * src->pitch);
+	d = ((word *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			d[j] = s[(xerr >> 16)];
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
+	}
+}
+
+
+void dd16_ScaleBlit_50lucent(int x, int y, int dw, int dh, image *src, image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	word *d, *s, c;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2
+	|| x + xl < cx1 || y + yl < cy1)
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (src->width << 16)/dw;
+	yadj = (src->height << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (word *) src->data;
+	s += ((yerr_start >> 16) * src->pitch);
+	d = ((word *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			c = s[xerr >> 16];
+			c = (c & tmask) + (d[j] & tmask);
+			d[j] = (word) (c >> 1);		
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
+	}
+}
+
+
+void dd16_ScaleBlit_lucent(int x, int y, int dw, int dh, image *src, image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	word *d, *s, c;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2
+	|| x + xl < cx1 || y + yl < cy1)
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (src->width << 16)/dw;
+	yadj = (src->height << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (word *) src->data;
+	s += ((yerr_start >> 16) * src->pitch);
+	d = ((word *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			word r1, g1, b1;
+			word r2, g2, b2;
+			word dp;
+
+			c = s[xerr>>16];
+			dp = d[j];
+				
+			r1 = (c & 0xF800) >> 11,
+			g1 = (c & 0x07E0) >> 5,
+			b1 = (c & 0x001F);
+
+			r2 = (dp & 0xF800) >> 11,
+			g2 = (dp & 0x07E0) >> 5,
+			b2 = (dp & 0x001F);
+
+			dp = ((((r1 * ialpha) + (r2 * alpha)) / 100) << 11) |
+				 ((((g1 * ialpha) + (g2 * alpha)) / 100) << 5) |
+				 ((((b1 * ialpha) + (b2 * alpha)) / 100));
+
+			d[j] = dp;
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
+	}
+}
 
 
 void dd16_ScaleBlit8(int x, int y, int dw, int dh, byte *src, int sw, int sh, quad pal[],  image *dest)
@@ -942,6 +2447,219 @@ void dd16_ScaleBlit8(int x, int y, int dw, int dh, byte *src, int sw, int sh, qu
 }
 
 
+void dd16_WrapBlit(int x, int y, image *src, image *dst)
+{
+	int i;
+	int cliph, clipw;
+	int curx, cury;
+	int spanx, spany;
+	word *source, *dest;
+
+	cliph = dst->cy2 - dst->cy1 + 1;
+	clipw = dst->cx2 - dst->cx1 + 1;
+	y %= src->height;
+	curx = 0;
+
+	do
+	{
+		x %= curx ? 1 : src->width;
+		spanx = src->width - x;
+		if (curx + spanx >= clipw)
+			spanx = clipw - curx;
+		source = (word *) src -> data + (y * src->width) + x;
+		dest = (word *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
+		cury = 0;
+
+		do
+		{
+			spany = src->height - (cury ? 0 : y);
+			if (cury + spany >= cliph)
+				spany = cliph - cury;
+
+			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
+				memcpy(dest, source, spanx*2);
+
+			source = (word *) src->data + x;
+			cury += spany;
+		} while (cury < cliph);
+		curx +=	spanx;
+	} while (curx < clipw);
+}  
+
+/*
+void dd16_WrapBlit_50lucent(int x, int y, image *src, image *dst)
+{
+	int i;
+	int cliph, clipw;
+	int curx, cury;
+	int spanx, spany;
+	word *source, *dest;
+	int sc;
+
+	cliph = dst->cy2 - dst->cy1 + 1;
+	clipw = dst->cx2 - dst->cx1 + 1;
+	y %= src->height;
+	curx = 0;
+
+	int dp5[2];
+	int dp6[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp5[1]=0x1F;
+	dp6[1]=0x3F;
+	
+	do
+	{
+		x %= curx ? 1 : src->width;
+		spanx = src->width - x;
+		if (curx + spanx >= clipw)
+			spanx = clipw - curx;
+		source = (word *) src -> data + (y * src->width) + x;
+		dest = (word *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
+		cury = 0;
+
+		do
+		{
+			spany = src->height - (cury ? 0 : y);
+			if (cury + spany >= cliph)
+				spany = cliph - cury;
+
+			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
+			{
+				for (int xi = 0; xi < spanx; xi++)
+				{
+					dp5[0]=((dest[xi]&0x1F)+(source[xi]&0x1F));
+					b=dp5[dp5[0]>>5];
+					dp6[0]=((dest[xi]&0x07E0)+(source[xi]&0x07E0))>>5;
+					g=dp6[dp6[0]>>6];
+					dp5[0]=((dest[xi]&0xF800)>>11)+((source[xi]&0xF800)>>11);
+					r=dp5[dp5[0]>>5];
+					dest[xi]=(r<<11)|(g<<5)|b;
+				}
+			}
+			source = (word *) src->data + x;
+			cury += spany;
+		} while (cury < cliph);
+		curx +=	spanx;
+	} while (curx < clipw);
+}  
+*/
+
+
+void dd16_WrapBlit_50lucent(int x, int y, image *src, image *dst)
+{
+	int i;
+	int cliph, clipw;
+	int curx, cury;
+	int spanx, spany;
+	word *source, *dest;
+	int sc;
+
+	cliph = dst->cy2 - dst->cy1 + 1;
+	clipw = dst->cx2 - dst->cx1 + 1;
+	y %= src->height;
+	curx = 0;
+
+	do
+	{
+		x %= curx ? 1 : src->width;
+		spanx = src->width - x;
+		if (curx + spanx >= clipw)
+			spanx = clipw - curx;
+		source = (word *) src -> data + (y * src->width) + x;
+		dest = (word *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
+		cury = 0;
+
+		do
+		{
+			spany = src->height - (cury ? 0 : y);
+			if (cury + spany >= cliph)
+				spany = cliph - cury;
+
+			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
+			{
+				for (int x = 0; x < spanx; x++)
+				{
+					sc=source[x];
+					sc=(sc & tmask) + (dest[x] & tmask);
+					dest[x] = (word) (sc >> 1);			
+				}
+			}
+
+			source = (word *) src->data + x;
+			cury += spany;
+		} while (cury < cliph);
+		curx +=	spanx;
+	} while (curx < clipw);
+}  
+
+
+void dd16_WrapBlit_lucent(int x, int y, image *src, image *dst)
+{
+	int i;
+	int cliph, clipw;
+	int curx, cury;
+	int spanx, spany;
+	word *source, *dest;
+	int sc;
+
+	cliph = dst->cy2 - dst->cy1 + 1;
+	clipw = dst->cx2 - dst->cx1 + 1;
+	y %= src->height;
+	curx = 0;
+
+	do
+	{
+		x %= curx ? 1 : src->width;
+		spanx = src->width - x;
+		if (curx + spanx >= clipw)
+			spanx = clipw - curx;
+		source = (word *) src -> data + (y * src->width) + x;
+		dest = (word *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
+		cury = 0;
+
+		do
+		{
+			spany = src->height - (cury ? 0 : y);
+			if (cury + spany >= cliph)
+				spany = cliph - cury;
+
+			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
+			{
+				for (int x = 0; x < spanx; x++)
+				{
+					word r1, g1, b1;
+					word r2, g2, b2;
+					word d;
+
+					sc=source[x];
+					d=dest[x];
+				
+					r1 = (sc & 0xF800) >> 11,
+					g1 = (sc & 0x07E0) >> 5,
+					b1 = (sc & 0x001F);
+
+					r2 = (d & 0xF800) >> 11,
+					g2 = (d & 0x07E0) >> 5,
+					b2 = (d & 0x001F);
+
+					d = ((((r1 * alpha) + (r2 * ialpha)) / 100) << 11) |
+						((((g1 * alpha) + (g2 * ialpha)) / 100) << 5) |
+						((((b1 * alpha) + (b2 * ialpha)) / 100));
+
+					dest[x] = d;
+				}
+			}
+
+			source = (word *) src->data + x;
+			cury += spany;
+		} while (cury < cliph);
+		curx +=	spanx;
+	} while (curx < clipw);
+}  
+
+
 image *dd16_ImageFrom8bpp(byte *src, int width, int height, byte *pal)
 {
 	word palconv[256], *p;
@@ -977,11 +2695,23 @@ image *dd16_ImageFrom24bpp(byte *src, int width, int height)
 	return img;
 }
 
+
 /********************** 32bpp blitter code **********************/
+
 
 int dd32_MakeColor(int r, int g, int b)
 {
 	return ((r<<16)|(g<<8)|b);
+}
+
+
+bool dd32_GetColor(int c, int *r, int *g, int *b)
+{
+	if (c == transColor) return false;
+	*b = c & 0xff;
+	*g = (c >> 8) & 0xff;
+	*r = (c >> 16) & 0xff;
+    return true;
 }
 
 
@@ -994,12 +2724,49 @@ void dd32_Clear(int color, image *dest)
 }
 
 
+int dd32_ReadPixel(int x, int y, image *source)
+{
+	quad *ptr = (quad*)source->data;
+	return ptr[(y * source->pitch) + x];
+}
+
+
 void dd32_PutPixel(int x, int y, int color, image *dest)
 {
 	int *ptr = (int *)dest->data;
 	if (x<dest->cx1 || x>dest->cx2 || y<dest->cy1 || y>dest->cy2)
 		return;
 	ptr[(y * dest->pitch) + x] = color;
+}
+
+
+void dd32_PutPixel_50lucent(int x, int y, int color, image *dest)
+{
+	quad s, c;
+	int *d=(int *)dest->data;
+
+	if (x<dest->cx1 || x>dest->cx2 || y<dest->cy1 || y>dest->cy2)
+		return;
+	
+	s=d[(y * dest->pitch) + x];
+	c=(s & tmask) + (color & tmask);
+	d[(y * dest->pitch) + x] = (int) (c >> 1);
+}
+
+
+void dd32_PutPixel_lucent(int x, int y, int color, image *dest)
+{
+	byte *d, *c;
+
+	if (x<dest->cx1 || x>dest->cx2 || y<dest->cy1 || y>dest->cy2)
+		return;
+
+	c = (byte *) &color;
+	d = (byte *) dest->data;
+	d += ((y*dest->pitch)+x)<<2;
+	*d = ((*d * alpha) + (*c * ialpha)) / 100; d++; c++;
+	*d = ((*d * alpha) + (*c * ialpha)) / 100; d++; c++;
+	*d = ((*d * alpha) + (*c * ialpha)) / 100;	
 }
 
 
@@ -1020,6 +2787,47 @@ void dd32_HLine(int x, int y, int xe, int color, image *dest)
 }
 
 
+void dd32_HLine_50lucent(int x, int y, int xe, int color, image *dest)
+{
+	int *d = (int *)dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	int s;
+	if (xe<x) SWAP(x,xe);
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || xe<cx1 || y<cy1)
+		return;
+
+	if (xe>cx2) xe=cx2;
+	if (x<cx1)  x =cx1;
+
+	d+=(y*dest->pitch)+x;
+	for (; x<=xe; x++)
+	{
+		s=*d;
+		s=(s & tmask) + (color & tmask);
+		*d++ = (s >> 1);
+	}
+}
+
+
+void dd32_HLine_lucent(int x, int y, int xe, int color, image *dest)
+{
+	int *d = (int *)dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	if (xe<x) SWAP(x,xe);
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || xe<cx1 || y<cy1)
+		return;
+
+	if (xe>cx2) xe=cx2;
+	if (x<cx1)  x =cx1;
+
+	d+=(y*dest->pitch)+x;
+	for (; x<=xe; x++)
+		PutPixel(x, y, color, dest);
+}
+
+
 void dd32_VLine(int x, int y, int ye, int color, image *dest)
 {
 	int *d = (int *) dest->data;
@@ -1034,6 +2842,790 @@ void dd32_VLine(int x, int y, int ye, int color, image *dest)
 	d += (y * dest->pitch) + x;
 	for (; y<=ye; y++, d+=dest->pitch)
 		*d = color;		
+}
+
+
+void dd32_VLine_50lucent(int x, int y, int ye, int color, image *dest)
+{
+	int *d = (int *)dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	int s;
+	if (ye<y) SWAP(y,ye);
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x<cx1 || ye<cy1)
+		return;
+
+	if (ye>cy2) ye=cy2;
+	if (y<cy1)  y =cy1;
+
+	d+=(y*dest->pitch)+x;
+	for (; y<=ye; x++)
+	{
+		s=*d;
+		s=(s & tmask) + (color & tmask);
+		*d++ = (s >> 1);
+	}
+}
+
+
+void dd32_VLine_lucent(int x, int y, int ye, int color, image *dest)
+{
+	quad *d = (quad *)dest->data;
+	int cx1=0, cy1=0, cx2=0, cy2=0;
+	if (ye<y) SWAP(y,ye);
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x<cx1 || ye<cy1)
+		return;
+
+	if (ye>cy2) ye=cy2;
+	if (y<cy1)  y =cy1;
+
+	d+=(y*dest->pitch)+x;
+	for (; y<=ye; y++)
+		PutPixel(x, y, color, dest);
+}
+
+
+void dd32_AddBlit(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int yi;
+
+	dp8[1]=0xFF;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		/*for(xi=0;xi<xlen;xi++)
+		{
+			dp8[0]=((d[xi]&0xFF)+(s[xi]&0xFF));
+			b=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0xFF00)+(s[xi]&0xFF00))>>8;
+			g=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0x00FF0000)+(s[xi]&0x00FF0000))>>16;
+			r=dp8[dp8[0]>>8];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}*/
+		__asm
+		{
+			mov esi,s;
+			mov edi,d;
+			mov ecx,xlen;
+
+			push ebp;
+			
+			dd32lab0:
+			lodsd;
+			mov edx,[edi];
+			mov ebx,eax;
+			mov ebp,edx;
+
+			//b
+			xor eax,eax;
+			add dl,bl;
+			adc al,0;
+			neg al;
+			or al,dl;
+			mov bl,al;
+
+			//g
+			mov edx,ebp;
+			xor eax,eax;
+			add dh,bh;
+			adc ah,0;
+			neg ah
+			or ah,dh;
+			mov bh,ah;
+
+			//r
+			mov edx,ebp;
+			ror ebx,16;
+			shr edx,16;
+			xor eax,eax;
+			add dl,bl;
+			adc al,0
+			neg al;
+			or al,dl;
+			
+			//build new rgb value
+			ror ebx,16;
+			shl eax,16;
+			mov ax,bx;
+
+			//store new rgb value
+			stosd;
+
+			//next x
+			loop dd32lab0;
+
+			pop ebp;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_AddBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0xFF;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp8[0]=((d[xi]&0xFF)+(s[xi]&0xFF)/2);
+			b=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0xFF00)+(s[xi]&0xFF00)/2)>>8;
+			g=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0x00FF0000)+(s[xi]&0x00FF0000)/2)>>16;
+			r=dp8[dp8[0]>>8];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_AddBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0xFF;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp8[0]=((d[xi]&0xFF)+((s[xi]&0xFF)*ialpha)/100);
+			b=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0xFF00)+((s[xi]&0xFF00)*ialpha)/100)>>8;
+			g=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0x00FF0000)+((s[xi]&0x00FF0000)*ialpha)/100)>>16;
+			r=dp8[dp8[0]>>8];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_TAddBlit(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0xFF;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp8[0]=((d[xi]&0xFF)+(s[xi]&0xFF));
+			b=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0xFF00)+(s[xi]&0xFF00))>>8;
+			g=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0x00FF0000)+(s[xi]&0x00FF0000))>>16;
+			r=dp8[dp8[0]>>8];
+			d[xi]=(r<<16)|(g<<8)|b;
+		}		
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_TAddBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0xFF;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp8[0]=((d[xi]&0xFF)+(s[xi]&0xFF)/2);
+			b=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0xFF00)+(s[xi]&0xFF00)/2)>>8;
+			g=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0x00FF0000)+(s[xi]&0x00FF0000)/2)>>16;
+			r=dp8[dp8[0]>>8];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+
+		s+=spitch;
+		d+=dpitch;
+
+	}		
+}
+
+void dd32_TAddBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0xFF;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp8[0]=((d[xi]&0xFF)+((s[xi]&0xFF)*ialpha)/100);
+			b=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0xFF00)+((s[xi]&0xFF00)*ialpha)/100)>>8;
+			g=dp8[dp8[0]>>8];
+			dp8[0]=((d[xi]&0x00FF0000)+((s[xi]&0x00FF0000)*ialpha)/100)>>16;
+			r=dp8[dp8[0]>>8];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_SubtractBlit(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp8[0]=((d[xi]&0xFF)-(s[xi]&0xFF));
+			b=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0xFF00)-(s[xi]&0xFF00))>>8;
+			g=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0x00FF0000)-(s[xi]&0x00FF0000))>>16;
+			r=dp8[(dp8[0]>>31)&1];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_SubtractBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0x00;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp8[0]=((d[xi]&0xFF)-(s[xi]&0xFF)/2);
+			b=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0xFF00)-(s[xi]&0xFF00)/2)>>8;
+			g=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0x00FF0000)-(s[xi]&0x00FF0000)/2)>>16;
+			r=dp8[(dp8[0]>>31)&1];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_SubtractBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			dp8[0]=((d[xi]&0xFF)-((s[xi]&0xFF)*ialpha)/100);
+			b=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0xFF00)-((s[xi]&0xFF00)*ialpha)/100)>>8;
+			g=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0x00FF0000)-((s[xi]&0x00FF0000)*ialpha)/100)>>16;
+			r=dp8[(dp8[0]>>31)&1];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_TSubtractBlit(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp8[0]=((d[xi]&0xFF)-(s[xi]&0xFF));
+			b=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0xFF00)-(s[xi]&0xFF00))>>8;
+			g=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0x00FF0000)-(s[xi]&0x00FF0000))>>16;
+			r=dp8[(dp8[0]>>31)&1];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+void dd32_TSubtractBlit_50lucent(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0x00;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp8[0]=((d[xi]&0xFF)-(s[xi]&0xFF)/2);
+			b=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0xFF00)-(s[xi]&0xFF00)/2)>>8;
+			g=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0x00FF0000)-(s[xi]&0x00FF0000)/2)>>16;
+			r=dp8[(dp8[0]>>31)&1];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+
+		s+=spitch;
+		d+=dpitch;
+	}		
+}
+
+
+void dd32_TSubtractBlit_lucent(int x, int y, image *src, image *dest)
+{
+	if(!ialpha)
+		return;
+
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen>cx2) xlen = cx2-x+1;
+	if (y+ylen>cy2) ylen = cy2-y+1;
+	if (x<cx1) 	{
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}
+
+	d += (y * dpitch) + x;
+
+	int dp8[2];
+	int r,g,b;
+	int xi,yi;
+
+	dp8[1]=0;
+	
+
+	for(yi=0;yi<ylen;yi++)
+	{
+		for(xi=0;xi<xlen;xi++)
+		{
+			if (s[xi] == transColor) continue;
+			dp8[0]=((d[xi]&0xFF)-((s[xi]&0xFF)*ialpha)/100);
+			b=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0xFF00)-((s[xi]&0xFF00)*ialpha)/100)>>8;
+			g=dp8[(dp8[0]>>31)&1];
+			dp8[0]=((d[xi]&0x00FF0000)-((s[xi]&0x00FF0000)*ialpha)/100)>>16;
+			r=dp8[(dp8[0]>>31)&1];
+
+			d[xi]=(r<<16)|(g<<8)|b;
+		}
+		s+=spitch;
+		d+=dpitch;
+	}		
 }
 
 
@@ -1068,6 +3660,63 @@ void dd32_Blit(int x, int y, image *src, image *dest)
 	d += (y * dpitch) + x;
 	for (xlen *= 4; ylen--; s+=spitch, d+=dpitch)
 		memcpy(d, s, xlen);
+}
+
+
+void dd32_Blit_50lucent(int x, int y, image *src, image *dest)
+{	
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
+		dpitch=dest->pitch;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	int sc;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}	
+	d+=y*dpitch+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			sc=s[x];
+	        sc=(sc & tmask) + (d[x] & tmask);
+			d[x] = (sc >> 1);
+		}
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd32_Blit_lucent(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data;
+	int h=src->height, w=src->width;
+	int j;
+
+	for (; h--; y++,x-=w)
+	{
+		for (j=w; j--; x++)
+			PutPixel(x, y, *s++, dest);
+	}
 }
 
 
@@ -1112,14 +3761,72 @@ void dd32_TBlit(int x, int y, image *src, image *dest)
 }
 
 
-void dd32_Blit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
-{
-	byte *s=(byte *) src;
-	quad *d=(quad *)dest->data;
-	int spitch=w,
+void dd32_TBlit_50lucent(int x, int y, image *src, image *dest)
+{	
+	int *s=(int *)src->data,
+		*d=(int *)dest->data;
+	int spitch=src->pitch,
 		dpitch=dest->pitch;
-	int xlen=w,
-		ylen=h;
+	int xlen=src->width,
+		ylen=src->height;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	int sc;
+
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
+		return;
+
+	if (x+xlen > cx2) xlen=cx2-x+1;
+	if (y+ylen > cy2) ylen=cy2-y+1;
+	if (x<cx1) {
+		s +=(cx1-x);
+		xlen-=(cx1-x);
+		x  =cx1;
+	}
+	if (y<cy1) {
+		s +=(cy1-y)*spitch;
+		ylen-=(cy1-y);
+		y  =cy1;
+	}	
+	d+=y*dpitch+x;
+	for (; ylen; ylen--)
+	{
+		for (x=0; x<xlen; x++)
+		{
+			sc=s[x]; if (sc == transColor) continue;
+	        sc=(sc & tmask) + (d[x] & tmask);
+			d[x] = (sc >> 1);
+		}
+		s+=spitch;
+		d+=dpitch;
+	}
+}
+
+
+void dd32_TBlit_lucent(int x, int y, image *src, image *dest)
+{
+	int *s=(int *)src->data;
+	int h=src->height, w=src->width;
+	int j;
+	for (; h--; y++,x-=w)
+	{
+		for (j=w; j--; x++)
+			if (*s != transColor) PutPixel(x, y, *s++, dest);
+			else s++;
+	}
+	
+}
+
+
+void dd32_BlitTile(int x, int y, char *src, image *dest)
+{
+	quad *s=(quad *) src,
+		 *d=(quad *)dest->data;
+	int spitch=16,
+		dpitch=dest->pitch;
+	int xlen=16,
+		ylen=16;
 	int cx1=0, cy1=0,
 		cx2=0, cy2=0;
 
@@ -1141,27 +3848,22 @@ void dd32_Blit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
 	}
 
 	d+=(y*dest->pitch)+x;
-	for (; ylen; ylen--)
-	{
-		for (x=0; x<xlen; x++)
-			d[x]=pal[s[x]];
-		s+=spitch;
-		d+=dpitch;
-	}
+	for (xlen*=4; ylen--; s+=spitch,d+=dpitch)
+    	memcpy(d, s, xlen);
 }
 
 
-void dd32_TBlit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
+void dd32_TBlitTile(int x, int y, char *src, image *dest)
 {
-	byte *s=(byte *) src;
-	quad *d=(quad *) dest->data;
-	int spitch=w,
+	quad *s=(quad *) src,
+		 *d=(quad *)dest->data;
+	int spitch=16,
 		dpitch=dest->pitch;
-	int xlen=w,
-		ylen=h;
+	int xlen=16,
+		ylen=16;
 	int cx1=0, cy1=0,
 		cx2=0, cy2=0;
-	byte c;
+	quad c;
 
 	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
 	if (x>cx2 || y>cy2 || x+xlen<cx1 || y+ylen<cy1)
@@ -1186,10 +3888,191 @@ void dd32_TBlit8(int x, int y, char *src, int w, int h, quad pal[], image *dest)
 		for (x=0; x<xlen; x++)
 		{
 			c=s[x];
-			if (c) d[x]=pal[c];
+			if (c != transColor) d[x]=c;
 		}
 		s+=spitch;
 		d+=dpitch;
+	}
+}
+
+
+void dd32_ScaleBlit(int x, int y, int dw, int dh, image *src, image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	quad *d, *s;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2
+	|| x + xl < cx1 || y + yl < cy1)
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (src->width << 16)/dw;
+	yadj = (src->height << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (quad *) src->data;
+	s += ((yerr_start >> 16) * src->pitch);
+	d = ((quad *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			d[j] = s[(xerr >> 16)];
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
+	}
+}
+
+
+void dd32_ScaleBlit_50lucent(int x, int y, int dw, int dh, image *src, image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	quad *d, *s, c;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+	
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2
+	|| x + xl < cx1 || y + yl < cy1)
+
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (src->width << 16)/dw;
+	yadj = (src->height << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (quad *) src->data;
+	s += ((yerr_start >> 16) * src->pitch);
+	d = ((quad *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			c = s[(xerr >> 16)];
+			c = (c & tmask) + (d[j] & tmask);
+			d[j] = (c >> 1);			
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
+	}
+}
+
+
+void dd32_ScaleBlit_lucent(int x, int y, int dw, int dh, image *src, image *dest)
+{
+	int i, j;
+	int xerr, yerr;
+	int xerr_start, yerr_start;
+	int xadj, yadj;
+	quad *d, *s, c;
+	int xl, yl, xs, ys;
+	int cx1=0, cy1=0,
+		cx2=0, cy2=0;
+
+	if (dw < 1 || dh < 1)
+		return;
+
+	xl = dw;
+	yl = dh;
+	xs = ys = 0;
+	dest->GetClip(&cx1, &cy1, &cx2, &cy2);
+	if (x > cx2 || y > cy2 || x + xl < cx1 || y + yl < cy1)
+		return;
+	if (x + xl > cx2)
+		xl = cx2 - x + 1;
+	if (y + yl > cy2)
+		yl = cy2 - y + 1;
+	if (x < cx1) { xs = cx1 - x; xl -= xs; x = cx1; }
+	if (y < cy1) { ys = cy1 - y; yl -= ys; y = cy1; }
+
+	xadj = (src->width << 16)/dw;
+	yadj = (src->height << 16)/dh;
+	xerr_start = xadj * xs;
+	yerr_start = yadj * ys;
+
+	s = (quad *) src->data;
+	s += ((yerr_start >> 16) * src->pitch);
+	d = ((quad *) dest->data) + (y * dest->pitch) + x;
+	yerr = yerr_start & 0xffff;
+
+	for (i = 0; i < yl; i += 1)
+	{
+		xerr = xerr_start;
+		for (j = 0; j < xl; j += 1)
+		{
+			quad r1, g1, b1;
+			quad r2, g2, b2;
+			quad dp;
+
+			c = s[xerr >> 16];					
+			dp = d[j];
+
+			r1 = (c >> 16) & 0xff,
+			g1 = (c >> 8) & 0xff,
+			b1 = (c & 0xff);
+
+			r2 = (dp >> 16) & 0xff,
+			g2 = (dp >> 8) & 0xff,
+			b2 = (dp & 0xff);
+
+			d[j] = ((((r1 * ialpha) + (r2 * alpha)) / 100) << 16) |
+		           ((((g1 * ialpha) + (g2 * alpha)) / 100) << 8) |
+				   ((((b1 * ialpha) + (b2 * alpha)) / 100));
+			xerr += xadj;
+		}
+		d    += dest->pitch;
+		yerr += yadj;
+		s    += (yerr>>16)*src->pitch;
+		yerr &= 0xffff;
 	}
 }
 
@@ -1225,6 +4108,118 @@ void dd32_WrapBlit(int x, int y, image *src, image *dst)
 
 			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
 				memcpy(dest, source, spanx*4);
+
+			source = (quad *) src->data + x;
+			cury += spany;
+		} while (cury < cliph);
+		curx +=	spanx;
+	} while (curx < clipw);
+}  
+
+
+void dd32_WrapBlit_50lucent(int x, int y, image *src, image *dst)
+{
+	int i;
+	int cliph, clipw;
+	int curx, cury;
+	int spanx, spany;
+	quad *source, *dest;
+	int sc;
+
+	cliph = dst->cy2 - dst->cy1 + 1;
+	clipw = dst->cx2 - dst->cx1 + 1;
+	y %= src->height;
+	curx = 0;
+
+	do
+	{
+		x %= curx ? 1 : src->width;
+		spanx = src->width - x;
+		if (curx + spanx >= clipw)
+			spanx = clipw - curx;
+		source = (quad *) src -> data + (y * src->width) + x;
+		dest = (quad *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
+		cury = 0;
+
+		do
+		{
+			spany = src->height - (cury ? 0 : y);
+			if (cury + spany >= cliph)
+				spany = cliph - cury;
+
+			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
+			{
+				for (int x = 0; x < spanx; x++)
+				{
+					sc=source[x];
+					sc=(sc & tmask) + (dest[x] & tmask);
+					dest[x] = (sc >> 1);			
+				}
+			}
+
+			source = (quad *) src->data + x;
+			cury += spany;
+		} while (cury < cliph);
+		curx +=	spanx;
+	} while (curx < clipw);
+}
+
+void dd32_WrapBlit_lucent(int x, int y, image *src, image *dst)
+{
+	int i;
+	int cliph, clipw;
+	int curx, cury;
+	int spanx, spany;
+	quad *source, *dest;
+	int sc;
+
+	cliph = dst->cy2 - dst->cy1 + 1;
+	clipw = dst->cx2 - dst->cx1 + 1;
+	y %= src->height;
+	curx = 0;
+
+	do
+	{
+		x %= curx ? 1 : src->width;
+		spanx = src->width - x;
+		if (curx + spanx >= clipw)
+			spanx = clipw - curx;
+		source = (quad *) src -> data + (y * src->width) + x;
+		dest = (quad *) dst -> data + (dst->cy1 * dst->pitch) + dst->cx1 + curx;
+		cury = 0;
+
+		do
+		{
+			spany = src->height - (cury ? 0 : y);
+			if (cury + spany >= cliph)
+				spany = cliph - cury;
+
+			for (i = 0; i < spany; i++, source += src->width, dest += dst->pitch)
+			{
+				for (int x = 0; x < spanx; x++)
+				{
+					quad r1, g1, b1;
+					quad r2, g2, b2;
+					quad d;
+
+					sc=source[x];					
+					d=dest[x];
+
+					r1 = (sc >> 16) & 0xff,
+					g1 = (sc >> 8) & 0xff,
+					b1 = (sc & 0xff);
+
+					r2 = (d >> 16) & 0xff,
+					g2 = (d >> 8) & 0xff,
+					b2 = (d & 0xff);
+
+					d = ((((r1 * alpha) + (r2 * ialpha)) / 100) << 16) |
+						((((g1 * alpha) + (g2 * ialpha)) / 100) << 8) |
+						((((b1 * alpha) + (b2 * ialpha)) / 100));
+
+					dest[x] = d;
+				}
+			}
 
 			source = (quad *) src->data + x;
 			cury += spany;
@@ -1272,6 +4267,184 @@ image *dd32_ImageFrom24bpp(byte *src, int width, int height)
 
 /*********************** blitter managment **********************/
 
+int SetLucent(int percent)
+{
+	if (percent < 0 || percent > 100) 
+		return alpha;
+	int oldalpha = alpha;
+	alpha = percent;
+	ialpha = 100 - alpha;
+
+	switch (vid_bpp)
+	{
+		case 15:
+			if (percent == 0)
+			{			
+				PutPixel		= dd16_PutPixel;
+				HLine			= dd16_HLine;
+				VLine			= dd16_VLine;
+				Blit            = dd16_Blit;
+				TBlit           = dd16_TBlit;
+				Blit8           = dd16_Blit8;
+				TBlit8			= dd16_TBlit8;
+				BlitTile        = dd16_BlitTile;
+				TBlitTile		= dd16_TBlitTile;
+				ScaleBlit       = dd16_ScaleBlit;
+				WrapBlit        = dd16_WrapBlit;
+				AdditiveBlit	= dd16_AddBlit;
+				TAdditiveBlit	= dd16_TAddBlit;
+				SubtractiveBlit	= dd16_SubtractBlit;
+				TSubtractiveBlit= dd16_TSubtractBlit;
+				return oldalpha;
+			}
+			else if (percent == 50)
+			{
+				PutPixel		= dd16_PutPixel_50lucent;
+				HLine			= dd16_HLine_50lucent;
+				VLine			= dd16_VLine_50lucent;
+				Blit            = dd16_Blit_50lucent;
+				TBlit			= dd16_TBlit_50lucent;
+				Blit8           = dd16_Blit8_50lucent;
+				TBlit8			= dd16_TBlit8_50lucent;
+				ScaleBlit		= dd16_ScaleBlit_50lucent;
+				WrapBlit		= dd16_WrapBlit_50lucent;
+				AdditiveBlit	= dd16_AddBlit_50lucent;
+				TAdditiveBlit	= dd16_TAddBlit_50lucent;
+				SubtractiveBlit	= dd16_SubtractBlit_50lucent;
+				TSubtractiveBlit= dd16_TSubtractBlit_50lucent;
+				return oldalpha;
+			}
+			else
+			{
+				PutPixel		= dd15_PutPixel_lucent;
+				Blit			= dd16_Blit_lucent;
+				TBlit			= dd16_TBlit_lucent;
+				Blit8           = dd16_Blit8_50lucent;
+				TBlit8			= dd16_TBlit8_50lucent;
+				HLine			= dd16_HLine_lucent;
+				VLine			= dd16_VLine_lucent;
+				ScaleBlit		= dd15_ScaleBlit_lucent;
+				WrapBlit		= dd15_WrapBlit_lucent;
+				AdditiveBlit	= dd16_AddBlit_lucent;
+				TAdditiveBlit	= dd16_TAddBlit_lucent;
+				SubtractiveBlit	= dd16_SubtractBlit_lucent;
+				TSubtractiveBlit= dd16_TSubtractBlit_lucent;
+				return oldalpha;
+			}
+			break;
+		case 16:
+			if (percent == 0)
+			{
+				PutPixel		= dd16_PutPixel;
+				HLine			= dd16_HLine;
+				VLine			= dd16_VLine;
+				Blit            = dd16_Blit;
+				TBlit           = dd16_TBlit;
+				Blit8           = dd16_Blit8;
+				TBlit8			= dd16_TBlit8;
+				BlitTile        = dd16_BlitTile;
+				TBlitTile		= dd16_TBlitTile;
+				ScaleBlit       = dd16_ScaleBlit;
+				WrapBlit        = dd16_WrapBlit;
+				AdditiveBlit	= dd16_AddBlit;
+				TAdditiveBlit	= dd16_TAddBlit;
+				SubtractiveBlit	= dd16_SubtractBlit;
+				TSubtractiveBlit= dd16_TSubtractBlit;
+				return oldalpha;
+			}
+			else if (percent == 50)
+			{
+				PutPixel		= dd16_PutPixel_50lucent;
+				HLine			= dd16_HLine_50lucent;
+				VLine			= dd16_VLine_50lucent;
+				Blit            = dd16_Blit_50lucent;
+				TBlit			= dd16_TBlit_50lucent;
+				Blit8           = dd16_Blit8_50lucent;
+				TBlit8			= dd16_TBlit8_50lucent;
+				ScaleBlit		= dd16_ScaleBlit_50lucent;
+				WrapBlit		= dd16_WrapBlit_50lucent;
+				AdditiveBlit	= dd16_AddBlit_50lucent;
+				TAdditiveBlit	= dd16_TAddBlit_50lucent;
+				SubtractiveBlit	= dd16_SubtractBlit_50lucent;
+				TSubtractiveBlit= dd16_TSubtractBlit_50lucent;
+				return oldalpha;
+			}
+			else
+			{
+				PutPixel		= dd16_PutPixel_lucent;
+				HLine			= dd16_HLine_lucent;
+				VLine			= dd16_VLine_lucent;
+				Blit			= dd16_Blit_lucent;
+				TBlit			= dd16_TBlit_lucent;
+				Blit8           = dd16_Blit8_50lucent;
+				TBlit8			= dd16_TBlit8_50lucent;
+				ScaleBlit		= dd16_ScaleBlit_lucent;
+				WrapBlit		= dd16_WrapBlit_lucent;
+				AdditiveBlit	= dd16_AddBlit_lucent;
+				TAdditiveBlit	= dd16_TAddBlit_lucent;
+				SubtractiveBlit	= dd16_SubtractBlit_lucent;
+				TSubtractiveBlit= dd16_TSubtractBlit_lucent;
+				return oldalpha;
+			}
+			break;
+		case 32:
+			if (percent == 0)
+			{
+				PutPixel		= dd32_PutPixel;
+				HLine			= dd32_HLine;
+				VLine			= dd32_VLine;
+				Blit            = dd32_Blit;
+				TBlit           = dd32_TBlit;
+				BlitTile        = dd32_BlitTile;
+				TBlitTile		= dd32_TBlitTile;
+				ScaleBlit       = dd32_ScaleBlit;
+				WrapBlit        = dd32_WrapBlit;
+				AdditiveBlit	= dd32_AddBlit;
+				TAdditiveBlit	= dd32_TAddBlit;
+				SubtractiveBlit	= dd32_SubtractBlit;
+				TSubtractiveBlit= dd32_TSubtractBlit;
+				return oldalpha;
+			}
+			else if (percent == 50)
+			{
+				PutPixel		= dd32_PutPixel_50lucent;
+				HLine			= dd32_HLine_50lucent;
+				VLine			= dd32_VLine_50lucent;
+				Blit            = dd32_Blit_50lucent;
+				TBlit			= dd32_TBlit_50lucent;
+				ScaleBlit		= dd32_ScaleBlit_50lucent;
+				WrapBlit		= dd32_WrapBlit_50lucent;
+				AdditiveBlit	= dd32_AddBlit_50lucent;
+				TAdditiveBlit	= dd32_TAddBlit_50lucent;
+				SubtractiveBlit	= dd32_SubtractBlit_50lucent;
+				TSubtractiveBlit= dd32_TSubtractBlit_50lucent;
+				return oldalpha;
+			}
+			else
+			{
+				PutPixel		= dd32_PutPixel_lucent;
+				HLine			= dd32_HLine_lucent;
+				VLine			= dd32_VLine_lucent;
+				Blit			= dd32_Blit_lucent;
+				TBlit			= dd32_TBlit_lucent;
+				ScaleBlit		= dd32_ScaleBlit_lucent;
+				WrapBlit		= dd32_WrapBlit_lucent;
+				AdditiveBlit	= dd32_AddBlit_lucent;
+				TAdditiveBlit	= dd32_TAddBlit_lucent;
+				SubtractiveBlit	= dd32_SubtractBlit_lucent;
+				TSubtractiveBlit= dd32_TSubtractBlit_lucent;
+
+				return oldalpha;
+			}
+
+			break;
+		default:
+			err("vid_bpp (%d) not a standard value", vid_bpp);
+	}
+	return percent;
+}
+
+
 void dd_RegisterBlitters()
 {
 	switch (vid_bpp)
@@ -1279,7 +4452,9 @@ void dd_RegisterBlitters()
 		case 15:
 			Flip			= vid_window ? ddwin_Flip : dd_Flip;
 			MakeColor		= dd15_MakeColor;
+			GetColor		= dd15_GetColor;
 			Clear			= dd16_Clear;
+			ReadPixel       = dd16_ReadPixel;
 			PutPixel		= dd16_PutPixel;
 			HLine			= dd16_HLine;
 			VLine			= dd16_VLine;
@@ -1292,15 +4467,25 @@ void dd_RegisterBlitters()
 			TBlit           = dd16_TBlit;
 			Blit8           = dd16_Blit8;
 			TBlit8			= dd16_TBlit8;
-			WrapBlit        = dd16_WrapBlit;
+			AdditiveBlit	= dd16_AddBlit;
+			TAdditiveBlit	= dd16_TAddBlit;
+			SubtractiveBlit = dd16_SubtractBlit;
+			TSubtractiveBlit= dd16_TSubtractBlit;			
+			BlitTile        = dd16_BlitTile;
+			TBlitTile		= dd16_TBlitTile;
+			ScaleBlit       = dd16_ScaleBlit;
 			ScaleBlit8      = dd16_ScaleBlit8;
+			WrapBlit        = dd16_WrapBlit;
 			ImageFrom8bpp	= dd16_ImageFrom8bpp;
 			ImageFrom24bpp	= dd16_ImageFrom24bpp;
+			tmask  			= 0x7BDE;
 			break;
 		case 16:
 			Flip			= vid_window ? ddwin_Flip : dd_Flip;
 			MakeColor		= dd16_MakeColor;
+			GetColor		= dd16_GetColor;
 			Clear			= dd16_Clear;
+			ReadPixel       = dd16_ReadPixel;
 			PutPixel		= dd16_PutPixel;
 			HLine			= dd16_HLine;
 			VLine			= dd16_VLine;
@@ -1313,15 +4498,25 @@ void dd_RegisterBlitters()
 			TBlit           = dd16_TBlit;
 			Blit8           = dd16_Blit8;
 			TBlit8			= dd16_TBlit8;
-			WrapBlit        = dd16_WrapBlit;
+			AdditiveBlit	= dd16_AddBlit;
+			TAdditiveBlit	= dd16_TAddBlit;
+			SubtractiveBlit = dd16_SubtractBlit;
+			TSubtractiveBlit= dd16_TSubtractBlit;			
+			BlitTile        = dd16_BlitTile;
+			TBlitTile		= dd16_TBlitTile;
+			ScaleBlit       = dd16_ScaleBlit;
 			ScaleBlit8      = dd16_ScaleBlit8;
+			WrapBlit        = dd16_WrapBlit;
 			ImageFrom8bpp	= dd16_ImageFrom8bpp;
 			ImageFrom24bpp	= dd16_ImageFrom24bpp;
+			tmask           = 0xF7DE;
 			break;
 		case 32:
 			Flip			= vid_window ? ddwin_Flip : dd_Flip;
 			MakeColor		= dd32_MakeColor;
+			GetColor		= dd32_GetColor;
 			Clear			= dd32_Clear;
+			ReadPixel       = dd32_ReadPixel;
 			PutPixel		= dd32_PutPixel;
 			HLine			= dd32_HLine;
 			VLine			= dd32_VLine;
@@ -1331,12 +4526,18 @@ void dd_RegisterBlitters()
 			Sphere          = dd_Sphere;
 			Circle          = dd_Circle;
 			Blit            = dd32_Blit;
+			AdditiveBlit	= dd32_AddBlit;
+			TAdditiveBlit	= dd32_TAddBlit;
+			SubtractiveBlit = dd32_SubtractBlit;
+			TSubtractiveBlit= dd32_TSubtractBlit;
 			TBlit           = dd32_TBlit;
-			Blit8	        = dd32_Blit8;
-			TBlit8			= dd32_TBlit8;
+			BlitTile        = dd32_BlitTile;
+			TBlitTile		= dd32_TBlitTile;
+			ScaleBlit       = dd32_ScaleBlit;
 			WrapBlit        = dd32_WrapBlit;
 			ImageFrom8bpp	= dd32_ImageFrom8bpp;
 			ImageFrom24bpp	= dd32_ImageFrom24bpp;
+			tmask           = 0xFEFEFEFE;
 			break;
 		default:
 			err("vid_bpp (%d) not a standard value", vid_bpp);

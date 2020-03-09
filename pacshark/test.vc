@@ -1,0 +1,19 @@
+event
+{
+ PaletteMorph(0,0,0,0,63);
+ MakeWall(1);
+ MakeFish(2);
+ HookRetrace(1);
+ playerx=10; playery=13;
+ fisherx=10; fishery=8;
+ SharkLoop();
+ FadeOut(100);
+ if (game=1) map("02.map");
+ else map("intro.map");
+}
+
+event
+{
+ Wavey();
+ FishRender();
+}

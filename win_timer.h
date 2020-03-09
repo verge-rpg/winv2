@@ -2,6 +2,7 @@
 #define TIMER_H
 
 extern quad systemtime, timer, vctimer;
+extern quad key_timer, key_repeater, repeatedkey;
 
 class xTimer
 {

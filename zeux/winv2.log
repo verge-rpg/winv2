@@ -1,0 +1,52 @@
+Initializing VC interpreter
+system vclib init: 183 funcs, 306 ints (16824 bytes), 11 strings
+title.map: mapevents 1,  codesize 667
+vc allocated 3520 bytes, ptr 14315016
+vc freed ptr at 20265040
+vc allocated 9600 bytes, ptr 20572032
+vc allocated 9600 bytes, ptr 20581688
+  > LoadSaidGame A 1
+Checksum: 3400 / 3400
+vc freed ptr at 9972976
+  > LoadSaidGame A 2
+Checksum: 492 / 492
+vc freed ptr at 9972720
+  > LoadSaidGame A 3
+Checksum: 205 / 205
+vc freed ptr at 9990624
+  > LoadSaidGame A 4
+Checksum: 0 / 0
+vc freed ptr at 9990368
+  > LoadSaidGame B 1
+Checksum: 3400 / 3400
+vc freed ptr at 9976896
+  > LoadSaidGame B 2
+Checksum: 492 / 492
+vc freed ptr at 9976640
+  > LoadSaidGame B 3
+Checksum: 205 / 205
+vc freed ptr at 9988336
+  > LoadSaidGame B 4
+Checksum: 0 / 0
+vc freed ptr at 9988080
+Checksum: 0 / 0
+vc freed ptr at 10630656
+vc allocated 200 bytes, ptr 10630400
+Checksum: 205
+vc opened ZEUX2.SAV for writing, handle 4926328
+vc closed file (w) at handle 4926328
+vc freed ptr at 10630400
+ --> VC opened file MAPDATA.DAT, ptr 0x00A23760
+ --> VC opened file RAINBOW.DAT, ptr 0x00A25950
+vc freed ptr at 20306056
+vc freed ptr at 20232584
+vc freed ptr at 20546584
+vc freed ptr at 20567120
+vc freed ptr at 20569576
+vc freed ptr at 20572032
+vc freed ptr at 20581688
+STAGE1-i.MAP: mapevents 1,  codesize 32
+vc allocated 64000 bytes, ptr 20856984
+Boingy Boingy Boingy
+Gem: 67,9
+Stage 0: 17 coins, 1 gems

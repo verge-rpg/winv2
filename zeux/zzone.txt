@@ -1,0 +1,135 @@
+ZoneInfo:
+
+1 - Brick
+2 - '?' Block with Coin
+3 - '?' Block with Gem
+4 - '?' Block with Life
+5 - Coin
+6 - Gem
+7 - Secret Exit
+8 - Exit
+9 - Waterline
+10 - '?' Block with Red Heart
+11 - '?' Block with Blue Heart*
+12 - '?' Block with Pouch
+13 - '?' Block with Ring*
+14 - '?' Block with Blast Potion*
+15 - '?' Block with Invinco Potion*
+16 - '?' Block with Wind Potion*
+17 - '?' Block with Slow Time Potion*
+18 - '?' Block with Kill Enemies Potion*
+19 - '?' Block with Random Potion*
+20 - Red Heart
+21 - Blue Heart*
+22 - Pouch*
+23 - Ring*
+24 - Blast Potion*
+25 - Invinco Potion*
+26 - Wind Potion*
+27 - Slow Time Potion*
+28 - Kill Enemies Potion*
+29 - Random Potion*
+30 - Avalanche Block
+31 - Blind Block
+32 - Wind Block
+33 - Lavawalk Block
+34 - Blast Spellbook
+35 - Invinco Spellbook
+36 - Wind Spellbook
+37 - Slow Time Spellbook
+38 - Kill Enemies Spellbook
+39 - Freeze Time Spellbook
+40 - Red Key
+41 - Blue Key
+42 - Yellow Key
+43 - Red Door
+44 - Blue Door
+45 - Yellow Door
+46 - Sword
+47 - Scepter
+48 - Mystery Book
+
+50 - Rope N
+51 - Rope NE
+52 - Rope E
+53 - Rope SE
+54 - Rope S
+55 - Rope SW
+56 - Rope W
+57 - Rope NW
+58 - Rope Block
+
+60 - Falling Bridge
+
+70 - Yellow Trampoline
+71 - Red Trampoline
+72 - Green Trampoline
+73 - Block with Yellow Trampoline
+74 - Block with Red Trampoline
+75 - Block with Green Trampoline
+76 - Phantom Trampoline
+
+90 - Block - Calls Map Event 1
+91 - Block - Calls Map Event 2
+92 - Block - Calls Map Event 3
+93 - Block - Calls Map Event 4
+94 - Block - Calls Map Event 5
+95 - Zone - Calls Map Event 1
+96 - Zone - Calls Map Event 2
+97 - Zone - Calls Map Event 3
+98 - Zone - Calls Map Event 4
+99 - Spinning Z
+100 - Gem Block - Ring, $5
+101 - Gem Block - Blue Heart, $10
+102 - Gem Block - Wind Book, $15
+103 - Gem Block - Slow Time Book, $20
+104 - Gem Block - Sword, $10
+105 - Gem Block - Life, $20
+106 - Gem Block - Invinco Book, $30
+107 - Gem Block - Wind Book, $10
+108 - Gem Block - Blast Book, $20
+109 - Gem Block - Scepter, $20
+110 - Gem Block - Scepter, $15
+111 - Gem Block - Freeze Time Book, $30
+112 - Gem Block - Blue Heart, $5
+113 - Gem Block - Invinco Book, $20
+114 - Gem Block - Kill Enemies Book, $50
+115 - Gem Block - Life, $10
+116 - Gem Block - Freeze Time Book, $20
+117 - Gem Block - Invinco Book, $15
+118 - Gem Block - Kill Enemies Book, $30
+119 - Gem Block - Mystery Book, $99
+
+150 to 159 - Melting Ice
+
+199 - Mini '?' Block with Coin
+
+200 - Blob Tile / Hurt Tile
+202 - Blob Tile / Death Tile
+
+210 - Teleport Right
+211 - Teleport Left
+
+230 - Red Flag Block
+231 - Blue Flag Block
+232 - Yellow Flag Block
+233 - Green Flag Block
+234 - Gray Flag Block
+235 - Invisible Wall
+
+240 - Ramp Up-Right
+241 - Ramp Up-Left
+242 - Pit (accelerates fall rate)
+243 - Strong Wind Right
+244 - Strong Wind Left
+245 - Backlash (Rainbow Wall)
+246 - Conveyor Belt Right
+247 - Conveyor Belt Left
+248 - Clockwise Spinner
+249 - Counterclockwise Spinner
+250 - Ice
+251 - Bones
+252 - Goop
+253 - Quicksand
+254 - Lava
+255 - Platform

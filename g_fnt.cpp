@@ -8,11 +8,9 @@
 /***************************** code *****************************/
 
 FNT::FNT(char *fname)
-{
-	// FIXME: Couldn't FNTs be loaded directly into hicolor mode?
+{	
 	VFILE *f = vopen(fname);
 	if (!f) err("FNT::FNT(), could not open %s", fname);
-
 	
 	byte ver = vgetc(f);
 	if (ver != 1)	
@@ -29,38 +27,24 @@ FNT::FNT(char *fname)
 	if (subsets < 1 || subsets > 4)
 		err("FNT::FNT(), illegal # of subsets");
 	
-	imagedata = new byte[width*height*96*subsets];
+	byte *imagedata = new byte[width*height*96*subsets];
 	vread(imagedata, width*height*96*subsets, f);
 	totalframes = 96 * subsets;
 	vclose(f);
+
+	rawdata = new image(width, height*96*subsets);
+	for (int i=0; i<width*height*96*subsets; i++)
+		PutPixel(i%width, i/width, imagedata[i] ? base_pal[imagedata[i]] : transColor, rawdata);
+	container = new image(width, height);
+	delete[] container->data;
+	delete[] imagedata;
 }
 
 FNT::~FNT()
-{
-	delete[] imagedata;
-
-}
-
-int FNT::uncompress(byte* dest, int len, char *buf)
-{
-    byte run, w;
-    do
-    {
-        run = 1;
-        w = *buf++;
-        if (0xFF == w)
-        {
-            run = *buf++;
-            w = *buf++;
-        }
-        len -= run;
-
-        if (len < 0)
-			return 1;
-        while (run--)
-            *dest++ = w;
-    } while (len);
-    return 0;
+{	
+	container->data = 0;
+	delete container;
+	delete rawdata;
 }
 
 void FNT::Render(int x, int y, int frame, image *dest)
@@ -68,8 +52,8 @@ void FNT::Render(int x, int y, int frame, image *dest)
 	if (frame >= totalframes)
 		err("FNT::Render(), char requested is undefined");
 
-	char *c = (char *) imagedata + (frame * width * height);
-	TBlit8(x, y, c, width, height, pal, dest);
+	container->data = (void *) ((int) rawdata->data + (frame*width*height*vid_bytesperpixel));
+	TBlit(x, y, container, dest);
 }
 
 void FNT::Print(int x, int y, char *str, ...)

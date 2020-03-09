@@ -4,7 +4,7 @@
  ****************************************************************/
 
 #include "xerxes.h"
-#include <ddraw.h>
+#include "ddraw.h"
 
 /***************************** data *****************************/
 
@@ -266,20 +266,20 @@ void dd_Flip()
 	HRESULT hr;
 
 	hr = dx_bs->BltFast(0,0,dx_os,NULL,DDBLTFAST_WAIT | DDBLTFAST_NOCOLORKEY);
-	if (hr==DDERR_SURFACELOST)
+	if(hr==DDERR_SURFACELOST)
 	{
 		dx_bs->Restore();
 		dx_os->Restore();
 		dx_bs->BltFast(0,0,dx_os,NULL,DDBLTFAST_WAIT | DDBLTFAST_NOCOLORKEY);
 	}
 
-	hr=dx_ps->Flip(0,DDFLIP_WAIT); // | DDFLIP_NOVSYNC);
+	hr=dx_ps->Flip(0,DDFLIP_WAIT);// | DDFLIP_NOVSYNC);
 	//dx_ps->Flip(0,0);
 
 	if(hr==DDERR_SURFACELOST)
 	{
 		dx_ps->Restore();
-		hr=dx_ps->Flip(0,DDFLIP_WAIT); // | DDFLIP_NOVSYNC);
+		hr=dx_ps->Flip(0,DDFLIP_WAIT);// | DDFLIP_NOVSYNC);
 	}
 	
 	
@@ -290,7 +290,6 @@ void dd_Flip()
 		hr=dx_os->Lock(0,&dx_osd,DDLOCK_SURFACEMEMORYPTR | DDLOCK_WRITEONLY | DDLOCK_WAIT,0);
 	}
 	dx_os->Unlock(0);
-	
 
 	screen->data=dx_osd.lpSurface;
 	screen->pitch=dx_osd.lPitch/vid_bytesperpixel;

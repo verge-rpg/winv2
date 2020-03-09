@@ -9,9 +9,9 @@
 
 CHR::CHR(char *fname)
 {
+	byte *imagedata;
 	VFILE *f = vopen(fname);
 	if (!f) err("CHR::CHR(), could not open %s", fname);
-// FIXME: Couldn't CHRs be loaded directly into hicolor mode?
 
 	byte ver;
 	vread(&ver, 1, f);
@@ -77,11 +77,21 @@ CHR::CHR(char *fname)
 		}
 	}	
 	vclose(f);
+
+	rawdata = new image(fxsize, fysize * totalframes);
+	for (int i=0; i<fxsize*fysize*totalframes; i++)
+		PutPixel(i%fxsize, i/fxsize, imagedata[i] ? base_pal[imagedata[i]] : transColor, rawdata);
+	container = new image(fxsize, fysize);
+	delete[] container->data;
+	delete[] imagedata;
+
 }
 
 CHR::~CHR()
 {
-	delete[] imagedata;
+	container->data = 0;
+	delete container;
+	delete rawdata;
 }
 
 int CHR::uncompress(byte* dest, int len, char *buf)
@@ -114,6 +124,6 @@ void CHR::Render(int x, int y, int frame, image *dest)
 	if (frame >= totalframes)
 		err("CHR::Render(), frame requested is undefined");
 
-	char *c = (char *) imagedata + (frame * fxsize * fysize);
-	TBlit8(x, y, c, fxsize, fysize, pal, dest);
+	container->data = (void *) ((int) rawdata->data + (frame*fxsize*fysize*vid_bytesperpixel));
+	TBlit(x, y, container, dest);
 }

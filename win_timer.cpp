@@ -7,7 +7,8 @@
 
 /***************************** data *****************************/
 
-quad systemtime = 0, timer = 0, vctimer = 0;;
+quad systemtime = 0, timer = 0, vctimer = 0;
+quad key_timer, key_repeater, repeatedkey;
 
 /***************************** code *****************************/
 

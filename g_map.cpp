@@ -263,7 +263,13 @@ void MAP::BlitTransLayer(byte l, image *dest, int tx, int ty, int xwin, int ywin
 				c = 0;
 			else
 				c = layers[l][(((ytc + i) * layer[l].sizex) + xtc + j)];
-			if (c) vsp -> TBlit((j * 16) + xofs, (i * 16) + yofs, c, dest);
+			if (layer[l].trans)
+			{
+				SetLucent(50);
+				if (c) vsp -> TBlit((j * 16) + xofs, (i * 16) + yofs, c, dest);
+				SetLucent(0);
+			}
+			else if (c) vsp -> TBlit((j * 16) + xofs, (i * 16) + yofs, c, dest);
 		}
 	curlayer++;
 }
@@ -317,7 +323,8 @@ void MAP::Render(int x, int y, image *dest)
 	src = rstring;
 	tx = dest -> width / 16;
 	ty = dest -> height / 16;
-	tx++; ty++;
+	tx+=2; ty+=2;
+	// FIXME: Why +=2???
 
 	while (*src)
 	{
