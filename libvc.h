@@ -96,6 +96,7 @@ void vc_LoadImage()
 {
 	string fname = ResolveString();
 	vcreturn = (int) xLoadImage8bpp(fname.c_str());
+	malloced_crap[num_malloced_crap++] = vcreturn;
 }
 
 void vc_CopySprite()
@@ -1076,9 +1077,8 @@ void vc_Silhouette()
 		Silhouette8(x, y, width, height, color, (byte *) ptr);
 }	
 
-void vc_WriteVars()
-{
-	FILE *f = (FILE *)ResolveOperand();
+void vc_WriteVars(FILE *f)
+{	
 	fwrite(globalint, 1, 4*maxint, f);
 	for (int n=0; n<stralloc; n++)
 	{
@@ -1089,10 +1089,9 @@ void vc_WriteVars()
 	}	
 }
 
-void vc_ReadVars()
+void vc_ReadVars(FILE *f)
 {
 	char *temp = 0;
-	FILE *f = (FILE *) ResolveOperand();
 	fread(globalint, 1, 4*maxint, f);
 
 	for (int n=0; n<stralloc; n++)
@@ -1104,7 +1103,7 @@ void vc_ReadVars()
 			err("vc_ReadVars: memory exhausted on %u bytes.", z);
 		fread(temp, 1, z, f);
 		temp[z]='\0';
-		vc_strings[n] = temp;
+		vc_strings[n].assign(temp);
         delete[] temp;
 		temp = 0;
 	}
@@ -1307,8 +1306,8 @@ void HandleStdLib()
 		case 100: vc_Silhouette(); break;
 		case 101: vcreturn = 0;	break;	
 		case 102: err("Mosaic() disabled!"); break;
-		case 103: vc_WriteVars(); break;
-		case 104: vc_ReadVars(); break;
+		case 103: vc_WriteVars((FILE *)ResolveOperand()); break;
+		case 104: vc_ReadVars((FILE *)ResolveOperand()); break;
 		case 105: ExecuteEvent(ResolveOperand()); break;
 		case 106: vc_Asc();	break;
 		case 107: ExecuteUserFunc(ResolveOperand()); break;

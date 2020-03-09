@@ -873,7 +873,7 @@ struct vardecl
 };
 
 int vc_paranoid         =0;     // paranoid VC checking
-
+int vc_arraycheck       =0;     // array range-checking
 char*	sysvc			=0;
 char*	mapvc			=0;
 char*	basevc			=0;		// VC pool ptrs
@@ -1166,7 +1166,6 @@ string GrabString()
 	return ret;
 }
 
-static int volume_hack = 100;
 int ReadInt(char category, int loc, int ofs)
 {
 	static char me2vc[] = { 0, 1, 0, 2, 3 };
@@ -1199,7 +1198,7 @@ int ReadInt(char category, int loc, int ofs)
 			case 12: return myscreen->width;
 			case 13: return myscreen->height;
 			case 14: return player;
-//			case 15: return cc;  ?????
+			case 15: return entities; // FIXME: 
 			case 16: return tracker;
 			case 17: return mouse_x;
 			case 18: return mouse_y;
@@ -1207,7 +1206,7 @@ int ReadInt(char category, int loc, int ofs)
 			case 20: return vctrack;
 			case 21: return width;
 			case 22: return depth;
-			case 23: return volume_hack;  // FIXME: volume crap
+			case 23: return s_getmusicvolume();
 			case 24: return (int) current_map->vsp->vspspace;
 			case 25: return 0; // lastent
 			case 26: return lastpressed;
@@ -1276,6 +1275,7 @@ int ReadInt(char category, int loc, int ofs)
 					if (vc_paranoid) err("entity.movecode: no such entity, pal. (%d)", ofs);
 				else return 0;
 				return entity[ofs]->movecode;
+			case 10: return ofs;
 			case 11: return keys[ofs];
 
 			case 13: return (int) (*(byte *)ofs);
@@ -1336,8 +1336,9 @@ void WriteInt(char category, int loc, int ofs, int value)
 			case 3: vctimer = value; return;
 			case 14: player = value; return;
 			case 16: tracker = value; return;
+			case 19: mouse_l = mouse_r = value; return;
 			case 20: vctrack = value; return;
-			case 23: volume_hack = value; return;
+			case 23: s_setmusicvolume(value); return;
 			case 26: lastpressed = value; return;
 			default: err("Unknown HVAR0 (%d) (set %d)", loc, value);
 		}
@@ -1382,14 +1383,14 @@ void WriteInt(char category, int loc, int ofs, int value)
 					else return;
 				switch (value)
 				{
-					case 0: entity[ofs]->setspeed(0);
-					case 1: entity[ofs]->setspeed(25);
-					case 2: entity[ofs]->setspeed(33);
-					case 3: entity[ofs]->setspeed(50);
-					case 4: entity[ofs]->setspeed(100);
-					case 5: entity[ofs]->setspeed(200);
-					case 6: entity[ofs]->setspeed(300);
-					case 7: entity[ofs]->setspeed(400);
+					case 0: entity[ofs]->setspeed(0); break;
+					case 1: entity[ofs]->setspeed(25); break;
+					case 2: entity[ofs]->setspeed(33); break;
+					case 3: entity[ofs]->setspeed(50); break;
+					case 4: entity[ofs]->setspeed(100); break;
+					case 5: entity[ofs]->setspeed(200); break;
+					case 6: entity[ofs]->setspeed(300); break;
+					case 7: entity[ofs]->setspeed(400); break;
 				}
 				return;
 			case 9: if (ofs<0 || ofs>=entities) 
@@ -1493,9 +1494,25 @@ int ProcessOperand()
 	{
 		case op_IMMEDIATE: return GrabD();
 		case op_HVAR0: c=GrabC(); return ReadInt(op_HVAR0, c, 0);
-		case op_HVAR1: c=GrabC(); ofs=ResolveOperand(); return ReadInt(op_HVAR1, c, ofs);
+		case op_HVAR1: c=GrabC(); ofs=ResolveOperand(); return ReadInt(op_HVAR1, c, ofs);			 
 		case op_UVAR:  d=GrabD(); return ReadInt(op_UVAR, d, 0);
-		case op_UVARRAY: d=GrabD(); d+=ResolveOperand(); return ReadInt(op_UVARRAY, d, 0);
+		case op_UVARRAY:
+		{
+			d=GrabD(); 
+			ofs=ResolveOperand(); 
+			if (!vc_arraycheck) 
+				return ReadInt(op_UVARRAY, d+ofs, 0);
+			for (int i=0; i<numvars; i++)
+				if (vars[i].varstartofs == d)
+				{
+					if (d >= vars[i].arraylen)
+						err("ProcessOperand(): range access violation on array %s (ofs %d)", vars[i].vname, d);
+					else
+						return ReadInt(op_UVARRAY, d+ofs, 0);
+				}				
+			err("ProcessOperand(): internal VC error: array accesses no known array");
+			break;
+		}
 		case op_LVAR:
 			c=GrabC();
 			if (c>19) err("ProcessOperand: bad offset to local ints %d", c);
@@ -1844,7 +1861,22 @@ void HandleAssign()
 	switch (c)
 	{
 		case op_UVAR:		base=GrabD(); break;
-		case op_UVARRAY:	base=GrabD(); base+=ResolveOperand(); break;
+		case op_UVARRAY:			
+		{
+			base=GrabD(); 
+			int ofs=ResolveOperand(); 
+			if (!vc_arraycheck) 
+			{
+				base += ofs;
+				break;
+			}
+			for (int i=0; i<numvars; i++)
+				if (vars[i].varstartofs == base)				
+					if (ofs >= vars[i].arraylen)
+						err("HandleAssign(): range access violation on write to array %s (ofs %d)", vars[i].vname, ofs);									
+			base += ofs;
+			break;
+		}
 		case op_HVAR0:		base=GrabC(); break;
 		case op_HVAR1:		base=GrabC(); offset=ResolveOperand(); break;
 		case op_LVAR:		base=GrabC(); break;

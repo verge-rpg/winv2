@@ -13,7 +13,7 @@ int cameratracking=1, tracker=0;
 MAP *current_map=0;
 Entity *myself;
 int xwin, ywin;
-bool done;
+bool done, inscroller=false;
 
 /****************************** code ******************************/
 
@@ -535,9 +535,11 @@ bool PlayerObstructed(int d)
 
 void CheckZone()
 {
+	int cur_timer = timer;
 	int cz = current_map->zone(myself->getx()/16, myself->gety()/16);
 	if (rnd(0,255) < current_map->zones[cz].percent)
 		ExecuteEvent(current_map->zones[cz].script);
+	timer = cur_timer;
 }
 
 
@@ -623,20 +625,69 @@ void ProcessControls()
 		if (current_map->zones[cz].script)
 		{
 			UnB1();
-			ExecuteEvent(current_map->zones[cz].script);			
+			int cur_timer = timer;
+			ExecuteEvent(current_map->zones[cz].script);
+			timer = cur_timer;
 		}
 	}
 }
 
-void Render()
+void MapScroller()
 {
+	inscroller = true;
+	int oldx = xwin;
+	int oldy = ywin;
+	int oldtimer = timer;
+	int oldvctimer = vctimer;
+	int oldcamera = cameratracking;
+	lastpressed = 0;
+
+	while (lastpressed != 41)
+	{
+		if (keys[SCAN_UP]) ywin--;
+		if (keys[SCAN_DOWN]) ywin++;
+		if (keys[SCAN_LEFT]) xwin--;
+		if (keys[SCAN_RIGHT]) xwin++;
+		UpdateControls();
+		Render();
+		ShowPage8();
+	}
+
+	lastpressed = 0;
+	keys[41] = 0;
+    cameratracking = oldcamera;
+	vctimer = oldvctimer;
+	timer = oldtimer;
+	ywin = oldy;
+	xwin = oldx;
+	inscroller = false;
+}
+
+void Render()
+{	
 	if (!current_map) return;
+
+	if (cheats && !inscroller && lastpressed == 41)
+		MapScroller();
+	if (cheats && lastpressed == 197)
+	{
+		keys[197] = 0;
+		lastpressed = 0;
+		obszone ^= 1;
+	}
+
 	int rmap = (current_map->mapwidth() * 16);
 	int dmap = (current_map->mapheight() * 16);
 	
 	switch (cameratracking)
 	{
 		case 0: 
+			if (xwin + myscreen->width >= rmap)
+				xwin = rmap - myscreen->width;
+			if (ywin + myscreen->height >= dmap)
+				ywin = dmap - myscreen->height;
+			if (xwin < 0) xwin = 0;
+			if (ywin < 0) ywin = 0;			
 			break;
 		case 1:	
 			if (myself)
@@ -687,7 +738,7 @@ void Engine_Start(char *mapname)
 	player = -1;
 	myself = 0;
 	
-	xwin = ywin = 0;	
+	xwin = ywin = 0;
 	done = false;
 	checkzone = false;
 	kill = 0;

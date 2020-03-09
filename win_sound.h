@@ -37,12 +37,8 @@ void FreeAllSamples(void);
 int PlaySample(MD_SAMPLE *s);
 int PlayMenuSample(MD_SAMPLE *s);
 
-int  s_getglobalvolume();
 int  s_getmusicvolume();
-int  s_getsndfcvolume();
-void s_setglobalvolume(int);
 void s_setmusicvolume(int);
-void s_setsndfxvolume(int);
 
 void CacheMusic(const char *sng);
 void s_CacheStartSession(void);

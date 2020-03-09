@@ -173,7 +173,7 @@ static void errorhandler(int merrnum, const CHAR *merrstr)
 
 static void killmodule(void)
 // Stops playing and unloads the current module.
-{
+{		
     music = false;
     
     if (mf)
@@ -548,10 +548,8 @@ void DeleteSampleCache(SampleCache *sbank)
         free(cruise);
         cruise = tmp;
     }
-
     sbank->list = NULL;
 }
-
 
 MD_SAMPLE *CacheSample(SampleCache *sbank, const char *si)
 {
@@ -560,6 +558,20 @@ MD_SAMPLE *CacheSample(SampleCache *sbank, const char *si)
     if(!UseSound) return NULL;
     if(!sbank) return NULL;
 
+	bool real=true;
+	if (!Exist((char *) si))
+	{
+		real = false;
+		VFILE *vf = vopen((char *) si);
+		FILE *f = fopen(si,"wb");		
+		int l = filesize(vf);
+		char *buffer = new char[l];
+		vread(buffer, l, vf);
+		fwrite(buffer, 1, l, f);		
+		fclose(f);
+		vclose(vf);
+	}
+    	
     // Check if our sample is already loaded first.  If so, just duplicate it!
 
     if(serm=FetchSample(sbank, si))
@@ -570,6 +582,8 @@ MD_SAMPLE *CacheSample(SampleCache *sbank, const char *si)
         SampleCache_NewEntry(sbank, si, serm);
     }
 	if (!serm) log("could not load sample: %s", si);
+	if (!real)
+		remove(si);
     return serm;
 }
 
@@ -597,38 +611,16 @@ int PlayMenuSample(MD_SAMPLE *s)
 // 100 as the default music volume.  I made a macro anyway, so we can change
 // thevolume scale with ease!
 
-#define VOLSCALE  100
-
-#define bs_setvol(x,a) Voiceset_SetVolume(x, (a * 128) / VOLSCALE)
-#define bs_getvol(x)   ((x->volume * VOLSCALE) / 128)
-
-int s_getglobalvolume()
-{
-    return bs_getvol(vs_global);
-}
-
-void s_setglobalvolume(int v)
-{
-    bs_setvol(vs_global, v);
-}
+#define VOLSCALE		100
+#define MIKMODSCALE		128
 
 int s_getmusicvolume()
 {
-    return bs_getvol(vs_music);
+    return Player_GetVolume(mp) * VOLSCALE / MIKMODSCALE;
 }
 
 void s_setmusicvolume(int v)
 {
-    bs_setvol(vs_music, v);
+	Player_SetVolume(mp, v * MIKMODSCALE / VOLSCALE);    
 }
 
-
-int s_getsndfxvolume()
-{
-    return bs_getvol(vs_sndfx);
-}
-
-void s_setsndfxvolume(int v)
-{
-    bs_setvol(vs_sndfx, v);
-}

@@ -1,3 +1,4 @@
+extern int obszone;
 struct layer_r
 {
   char pmultx,pdivx;                 // parallax multiplier/divisor for X
@@ -78,6 +79,7 @@ public:
 	void BlitBackLayer(byte l, image *dest, int tx, int ty, int xwin, int ywin);
 	void BlitTransLayer(byte l, image *dest, int tx, int ty, int xwin, int ywin);
 	void BlitObs(image *dest, int tx, int ty, int xwin, int ywin);
+	void BlitZone(image *dest, int tx, int ty, int xwin, int ywin);
 	void DecodeByteCompression(byte *dest, int len, byte *buf);
 	void DecodeWordCompression(word *dest, int len, word *buf);
 };

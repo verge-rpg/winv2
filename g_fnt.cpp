@@ -137,4 +137,5 @@ void PrintText(int font, char *str)
 {
 	if (font > numfonts) err("PrintText: Requested font out of range.");
 	fnts[font]->PrintRaw(my_x, my_y, str);
+	my_x += strlen(str)*fnts[font]->width;
 }

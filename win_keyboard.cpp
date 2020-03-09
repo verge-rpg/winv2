@@ -106,7 +106,7 @@ int ParseKeyEvent()
 
 	if (key_pressed && bindarray[lastpressed])
 		HookKey(bindarray[lastpressed]);
-	if (key_pressed) 
+	if (key_pressed)
 		return 1;
 	return 0;
 }

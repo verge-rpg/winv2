@@ -3,9 +3,48 @@
 <pre>
 <h1>Build Log</h1>
 <h3>
---------------------Configuration: winv2 - Win32 Release--------------------
+--------------------Configuration: winv2 - Win32 Debug--------------------
 </h3>
 <h3>Command Lines</h3>
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP1A5.tmp" with contents
+[
+/nologo /MTd /W3 /Gm /GX /ZI /Od /I "mikmod\\" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /Fp"Debug/winv2.pch" /YX /Fo"Debug/" /Fd"Debug/" /FD /GZ /c 
+"C:\winv2\g_engine.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP1A5.tmp" 
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP1A6.tmp" with contents
+[
+kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib winmm.lib dxguid.lib ddraw.lib dinput.lib wsock32.lib mikmod.lib mmio.lib dsound.lib /nologo /subsystem:windows /incremental:yes /pdb:"Debug/winv2.pdb" /debug /machine:I386 /out:"Debug/winv2.exe" /pdbtype:sept 
+.\Debug\a_common.obj
+.\Debug\a_config.obj
+.\Debug\a_image.obj
+.\Debug\a_vfile.obj
+.\Debug\g_8bpp.obj
+.\Debug\g_chr.obj
+.\Debug\g_controls.obj
+.\Debug\g_engine.obj
+.\Debug\g_fnt.obj
+.\Debug\g_map.obj
+.\Debug\g_startup.obj
+.\Debug\g_vc.obj
+.\Debug\g_vsp.obj
+.\Debug\vid_ddbase.obj
+.\Debug\vid_ddblit.obj
+.\Debug\vid_manager.obj
+.\Debug\vid_sysfont.obj
+.\Debug\win_joystick.obj
+.\Debug\win_keyboard.obj
+.\Debug\win_mouse.obj
+.\Debug\win_network.obj
+.\Debug\win_sound.obj
+.\Debug\win_system.obj
+.\Debug\win_timer.obj
+]
+Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSP1A6.tmp"
+<h3>Output Window</h3>
+Compiling...
+g_engine.cpp
+Linking...
 
 
 

@@ -6,12 +6,11 @@
 #include "xerxes.h"
 #include "vergepal.h"
 
-/**************************
+/******************
   TODO:
-      * SFX from packfile
-	  * Entity / engine routines:
-	    - numentsonscreen, entsonscreen[]		
-***************************/
+	* maybe fix switch() ??
+*******************/
+
 
 /****************************** data ******************************/
 
@@ -19,6 +18,7 @@ int v2_xres, v2_yres;
 bool eagle;
 bool windowmode;
 bool sound;
+bool cheats;
 image *myscreen;
 char mapname[80];
 
@@ -31,6 +31,7 @@ void InitDefaults()
 	eagle = false;
 	windowmode = false;
 	sound = true;	
+	cheats = false;
 }
 
 void LoadConfig()
@@ -52,8 +53,12 @@ void LoadConfig()
 		strcpy(mapname, cfg_GetKeyValue("startmap"));
 	if (cfg_KeyPresent("paranoid"))
 		vc_paranoid = atoi(cfg_GetKeyValue("paranoid"));
+	if (cfg_KeyPresent("arraycheck"))
+		vc_arraycheck = atoi(cfg_GetKeyValue("arraycheck"));
 	if (cfg_KeyPresent("appname"))
 		SetWindowText(hMainWnd, cfg_GetKeyValue("appname"));
+	if (cfg_KeyPresent("vecnascockishuge"))
+		cheats = true;
 
 	if (cfg_KeyPresent("mount1"))
 		MountVFile(cfg_GetKeyValue("mount1"));

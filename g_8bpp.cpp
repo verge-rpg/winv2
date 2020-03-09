@@ -527,7 +527,7 @@ void PutPixel8_Lucent(int x, int y, int c)
 {
 	if (x<clip_x || x>clip_xend || y<clip_y || y>clip_yend)
 		return;
-	screen8[(y * screen_width) + x] = transtbl[screen8[(y * screen_width) + x]][c];
+	screen8[(y * screen_width) + x] = transtbl[c][screen8[(y * screen_width) + x]];
 }
 
 void CopySprite8_Lucent(int x, int y, int width, int height, byte *source)
@@ -616,7 +616,7 @@ void HLine8_Lucent(int x, int y, int xe, int color)
 
 	d += (y * screen_width) + x;
 	for (; x<=xe; x++, d++)
-		*d = transtbl[*d][color];
+		*d = transtbl[color][*d];
 }
 
 void VLine8_Lucent(int x, int y, int ye, int color)
@@ -630,7 +630,7 @@ void VLine8_Lucent(int x, int y, int ye, int color)
 
 	d += (y * screen_width) + x;
 	for (; y<=ye; y++, d+=screen_width)
-		*d = transtbl[*d][color];
+		*d = transtbl[color][*d];
 }
 
 void Line8_Lucent(int x, int y, int xe, int ye, int color)
@@ -822,7 +822,7 @@ void ScaleSprite8_Lucent(int x, int y, int sw, int sh, int dw, int dh, byte *s)
 		xerr = xerr_start;
 		for (j = 0; j < xl; j += 1)
 		{
-			d[j] = transtbl[d[j]][s[(xerr >> 16)]];
+			d[j] = transtbl[s[(xerr >> 16)]][d[j]];
 			xerr += xadj;
 		}
 		d    += screen_width;
@@ -874,7 +874,7 @@ void TScaleSprite8_Lucent(int x, int y, int sw, int sh, int dw, int dh, byte *s)
 		for (j = 0; j < xl; j += 1)
 		{
 			c = s[(xerr >> 16)];
-			if (c) d[j] = transtbl[d[j]][c];
+			if (c) d[j] = transtbl[c][d[j]];
 			xerr += xadj;
 		}
 		d    += screen_width;
@@ -918,7 +918,7 @@ void Silhouette8_Lucent(int x, int y, int width, int height, byte color, byte* s
 		do
 		{
 			if (*source)
-				*dest = transtbl[*dest][color];
+				*dest = transtbl[color][*dest];
 			source += 1;
 			dest += 1;
 			x -= 1;

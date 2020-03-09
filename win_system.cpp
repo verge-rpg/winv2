@@ -4,11 +4,7 @@
  ****************************************************************/
 
 /**************** TODO *************
-  + Add a getch() style function to win_keyboard that handles case, etc. dpad??
-  + add volume controls to win_mp3, find a way to handle looping???
   + Redo VFILE* stuff and A_IMAGE.
-  + Memory system???
-  + Mouse routines! :o
   + fix strlwr in a_image
  ***********************************/
 
@@ -79,8 +75,7 @@ void HandleMessages(void)
 LRESULT APIENTRY WndProc(HWND hWnd, UINT message,WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
-	{
-		case WM_DESTROY:
+	{		
 		case WM_CLOSE:
 			err("");
 			break;
@@ -135,7 +130,13 @@ void err(char *str, ...)
 	va_start(argptr, str);
 	vsprintf(msg, str, argptr);
 	va_end(argptr);
-	
+
+	if(vid_Close)
+ 	{
+ 		vid_Close();
+ 		DestroyWindow(hMainWnd);
+ 	}	
+
 	if (strlen(msg))
 	{
 		MessageBox(GetDesktopWindow(), msg, APPNAME, MB_OK | MB_TASKMODAL);

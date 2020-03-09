@@ -58,7 +58,8 @@ void dd_init()
 	dx_win_bsd.dwSize = sizeof(DDSURFACEDESC);
     dx_win_bsd.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT;    
     dx_win_bsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_SYSTEMMEMORY;
-
+	 	
+	vid_Close = dd_Close;
 	dd_initd = true;
 }
 
@@ -123,6 +124,7 @@ int dd_SetMode(int xres, int yres, int bpp, bool windowflag)
 		ws &= ~WS_OVERLAPPEDWINDOW;
 		ws |= WS_POPUP;
 		SetWindowLong(hMainWnd, GWL_STYLE, ws);
+		SetWindowPos(hMainWnd,0,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE|SWP_FRAMECHANGED);
 
 		DDPIXELFORMAT ddpf;
 		ddpf.dwSize = sizeof(ddpf);
@@ -217,6 +219,7 @@ int dd_SetMode(int xres, int yres, int bpp, bool windowflag)
 		SetRect(&r2, 0, 0, xres, yres);
 		AdjustWindowRectEx(&r2, ws, GetMenu(hMainWnd) != NULL, GetWindowLong(hMainWnd, GWL_EXSTYLE));
 		SetWindowPos(hMainWnd, 0, r.left, r.top, r2.right - r2.left, r2.bottom - r2.top, SWP_NOZORDER | SWP_NOACTIVATE);
+		SetWindowPos(hMainWnd,0,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE|SWP_FRAMECHANGED);
 
 		DDPIXELFORMAT ddpf;
 		ddpf.dwSize = sizeof(ddpf);

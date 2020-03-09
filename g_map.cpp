@@ -6,7 +6,8 @@
 
 #include "xerxes.h"
  
-// ***************************** Code *****************************
+// ***************************** code *****************************
+int obszone = 0;
 
 MAP::MAP(char *fname)
 {
@@ -317,7 +318,30 @@ void MAP::BlitObs(image *dest, int tx, int ty, int xwin, int ywin)
 		for (j = 0; j< tx; j++)
 		{
 			c = Obstruct[(((ytc + i) * layer[0].sizex) + xtc + j)];
-			if (c) Rect((j * 16) + xofs, (i * 16) + yofs, (j * 16) + xofs + 15, (i * 16) + yofs + 15, 0, dest);
+			if (c) Rect8_Lucent((j * 16) + xofs, (i * 16) + yofs, (j * 16) + xofs + 15, (i * 16) + yofs + 15, 0);
+		}
+	SetLucent(0);
+	curlayer++;
+}
+
+void MAP::BlitZone(image *dest, int tx, int ty, int xwin, int ywin)
+{
+	int i, j, c;
+	int oxw, oyw, xofs, yofs, xtc, ytc;
+
+	oxw = xwin;
+	oyw = ywin;
+	xofs =- (oxw & 15);
+	yofs =- (oyw & 15);
+	xtc = oxw >> 4;
+	ytc = oyw >> 4;
+	
+	SetLucent(50);
+	for (i = 0; i < ty; i++)
+		for (j = 0; j< tx; j++)
+		{
+			c = Zone[(((ytc + i) * layer[0].sizex) + xtc + j)];
+			if (c) Rect8_Lucent((j * 16) + xofs, (i * 16) + yofs, (j * 16) + xofs + 15, (i * 16) + yofs + 15, 31);
 		}
 	SetLucent(0);
 	curlayer++;
@@ -364,5 +388,9 @@ void MAP::Render(int x, int y, image *dest)
 	    }
 		src++;
 	}
-	//BlitObs(dest, tx, ty, x, y);
+	if (obszone)
+	{
+		BlitObs(dest, tx, ty, x, y);
+		BlitZone(dest, tx, ty, x, y);
+	}
 }
